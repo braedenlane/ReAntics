@@ -31,9 +31,12 @@ class AIPlayer(Player):
     ##
     def __init__(self, inputPlayerId):
         super(AIPlayer, self).__init__(inputPlayerId, "Dominus")
-        # the coordinates of the agent's food and tunnel will be stored in these
+        # the coordinates of the agent's food closest to the tunnel and tunnel will be stored in these
         # variables (see getMove() below)
-        self.myFood = None
+        # coordinates of the agent's food closest to the hill and hill will be stored as well
+        self.myTunnelFood = None
+        self.myHillFood = None
+        self.myHill = None
         self.myTunnel = None
 
     ##
@@ -93,22 +96,82 @@ class AIPlayer(Player):
 
         myInv = currentState.inventories[myId]
         myAnts = myInv.ants
-        antTypes = [WORKER, DRONE, SOLDIER, R_SOLDIER]
 
-        countWorker = 0
-        countDrone = 0
-        for ant in myAnts:
-            if ant == WORKER:
-                countWorker+=1
-            if ant == DRONE:
-                countDrone+=1
+        # the first time this method is called, the foods, hill, and tunnel locations
+        # need to be recorded in their respective instance variables
+        if (self.myTunnel == None):
+            self.myTunnel = getConstrList(currentState, me, (TUNNEL,))[0]
+        if (self.myHill == None):
+            self.myHill = getConstrList(currentState, me, (HILL,))[0]
+        if (self.myTunnelFood == None):
+            foods = getConstrList(currentState, None, (FOOD,))
+            self.myTunnelFood = foods[0]
+            # find the food closest to the tunnel
+            bestDistSoFar = 1000  # i.e., infinity
+            for food in foods:
+                dist = stepsToReach(currentState, self.myTunnel.coords, food.coords)
+                if (dist < bestDistSoFar):
+                    self.myTunnelFood = food
+                    bestDistSoFar = dist
+        if (self.myHillFood == None):
+            foods = getConstrList(currentState, None, (FOOD,))
+            self.myHillFood = foods[0]
+            # find the food closest to the hill
+            bestDistSoFar = 1000  # i.e., infinity
+            for food in foods:
+                dist = stepsToReach(currentState, self.myHill.coords, food.coords)
+                if (dist < bestDistSoFar):
+                    self.myHillFood = food
+                    bestDistSoFar = dist
 
+        # if I don't have a worker, and am out of food, give up, since food can't be collected
+        numAnts = len(myInv.ants)
+        if (numAnts == 1 & myInv.foodCount == 0):
+            return Move(END, None, None)
+
+        # if the queen is on the anthill move her
+        myQueen = myInv.getQueen()
+        if (myQueen.coords == myInv.getAnthill().coords):
+            return Move(MOVE_ANT, [myInv.getQueen().coords, (2, 0)], None)
+
+        # if the hasn't moved, have her move in place so she will attack
+        if (not myQueen.hasMoved):
+            return Move(MOVE_ANT, [myQueen.coords], None)
+
+        # Counts of my different ants to determine what "phase" we're in
+        countWorker = len(getAntList(currentState, myId, (WORKER,)))
+        countDrone = len(getAntList(currentState, myId, (DRONE,)))
+
+        # Phases:
+        #      - Have the AI shoot for 2 workers, a drone, and then another worker.
+        #      - Check these numbers each turn and replenish as needed
         if countWorker < 2:
-            # Phase make another worker if enough food
+            if myInv.foodCount >= 1:
+                return Move(BUILD, [myInv.getAnthill().coords], WORKER)
         if countDrone < 1:
-            # Phase make a Drone if enough food
+            if myInv.foodCount >= 2:
+                return Move(BUILD, [myInv.getAnthill().coords], DRONE)
         if countDrone == 1 & countWorker < 3:
-            # Phase make another worker if enough food
+            if myInv.foodCount >= 1:
+                return Move(BUILD, [myInv.getAnthill().coords], WORKER)
+
+        # Region: Worker behavior
+        #     - If not carrying food, move toward closest food source
+        #     - If adjacent to a food source, and not carrying, move onto food source and end move
+        #     - If carrying food, navigate to closest friendly construction
+        #     - If adjacent to construction, and carrying, move onto const. and end move
+        myWorkers = getAntList(currentState, me, (WORKER,))
+        for worker in myWorkers:
+            if not (worker.hasMoved):
+                if not (worker.carrying):
+                    workerX = worker.coords[0]
+                    workerY = worker.coords[1]
+
+                    # calculate the closest food
+
+        # Region: Drone behavior
+        #     - Navigate to the nearest enemy worker (Note, don't send two drones to the same worker)
+        #     - If adjacent to enemy worker, attack
 
 
 
@@ -128,8 +191,8 @@ class AIPlayer(Player):
     ##
     # registerWin
     #
-    # This agent doens't learn
+    # This agent doesn't learn
     #
     def registerWin(self, hasWon):
-        # method templaste, not implemented
+        # method template, not implemented
         pass
