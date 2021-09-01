@@ -2,13 +2,13 @@
 import random
 import sys
 sys.path.append("..")  #so other modules can be found in parent dir
-from src.Player import *
-from src.Constants import *
-from src.Construction import CONSTR_STATS
-from src.Ant import UNIT_STATS
-from src.Move import Move
-from src.GameState import addCoords
-from src.AIPlayerUtils import *
+from Player import *
+from Constants import *
+from Construction import CONSTR_STATS
+from Ant import UNIT_STATS
+from Move import Move
+from GameState import addCoords
+from AIPlayerUtils import *
 
 
 ##

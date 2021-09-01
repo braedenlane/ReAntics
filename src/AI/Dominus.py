@@ -1,10 +1,10 @@
-from src.Player import *
-from src.Constants import *
-from src.Construction import CONSTR_STATS
-from src.Ant import UNIT_STATS
-from src.Move import Move
-from src.GameState import *
-from src.AIPlayerUtils import *
+from Player import *
+from Constants import *
+from Construction import CONSTR_STATS
+from Ant import UNIT_STATS
+from Move import Move
+from GameState import *
+from AIPlayerUtils import *
 import random
 import sys
 sys.path.append("..")  #so other modules can be found in parent dir
@@ -54,22 +54,10 @@ class AIPlayer(Player):
         numToPlace = 0
         # implemented by students to return their next move
         if currentState.phase == SETUP_PHASE_1:  # stuff on my side
-            numToPlace = 11
-            moves = []
-            for i in range(0, numToPlace):
-                move = None
-                while move == None:
-                    # Choose any x location
-                    x = random.randint(0, 9)
-                    # Choose any y location on your side of the board
-                    y = random.randint(0, 3)
-                    # Set the move if this space is empty
-                    if currentState.board[x][y].constr == None and (x, y) not in moves:
-                        move = (x, y)
-                        # Just need to make the space non-empty. So I threw whatever I felt like in there.
-                        currentState.board[x][y].constr == True
-                moves.append(move)
-            return moves
+            # Ideal location for the ant hill and tunnel, minimizing the distance to any food source location
+            # Grass placed defensively to protect ant hill, also placed to reduce food distance
+            return [(2, 1), (7, 2), (0, 3), (1, 3), (2, 3),
+                    (3, 3), (4, 3), (5, 3), (6, 3), (5, 0), (9,0)]
         elif currentState.phase == SETUP_PHASE_2:  # stuff on foe's side
             numToPlace = 2
             moves = []
@@ -100,15 +88,29 @@ class AIPlayer(Player):
     # Return: The Move to be made
     ##
     def getMove(self, currentState):
-        moves = listAllLegalMoves(currentState)
-        selectedMove = moves[random.randint(0, len(moves) - 1)];
+        myId = currentState.whoseTurn
+        enemyId = 1 - myId
 
-        # don't do a build move if there are already 3+ ants
-        numAnts = len(currentState.inventories[currentState.whoseTurn].ants)
-        while (selectedMove.moveType == BUILD and numAnts >= 3):
-            selectedMove = moves[random.randint(0, len(moves) - 1)];
+        myInv = currentState.inventories[myId]
+        myAnts = myInv.ants
+        antTypes = [WORKER, DRONE, SOLDIER, R_SOLDIER]
 
-        return selectedMove
+        countWorker = 0
+        countDrone = 0
+        for ant in myAnts:
+            if ant == WORKER:
+                countWorker+=1
+            if ant == DRONE:
+                countDrone+=1
+
+        if countWorker < 2:
+            # Phase make another worker if enough food
+        if countDrone < 1:
+            # Phase make a Drone if enough food
+        if countDrone == 1 & countWorker < 3:
+            # Phase make another worker if enough food
+
+
 
     ##
     # getAttack
