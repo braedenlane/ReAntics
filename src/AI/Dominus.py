@@ -100,9 +100,9 @@ class AIPlayer(Player):
         # the first time this method is called, the foods, hill, and tunnel locations
         # need to be recorded in their respective instance variables
         if (self.myTunnel == None):
-            self.myTunnel = getConstrList(currentState, me, (TUNNEL,))[0]
+            self.myTunnel = getConstrList(currentState, myId, (TUNNEL,))[0]
         if (self.myHill == None):
-            self.myHill = getConstrList(currentState, me, (HILL,))[0]
+            self.myHill = getConstrList(currentState, myId, (ANTHILL,))[0]
         if (self.myTunnelFood == None):
             foods = getConstrList(currentState, None, (FOOD,))
             self.myTunnelFood = foods[0]
@@ -127,6 +127,13 @@ class AIPlayer(Player):
         # if I don't have a worker, and am out of food, give up, since food can't be collected
         numAnts = len(myInv.ants)
         if (numAnts == 1 & myInv.foodCount == 0):
+            return Move(END, None, None)
+
+        endTurnCheck = True
+        for ant in myInv.ants:
+            if not (ant.hasMoved):
+                endTurnCheck = False
+        if endTurnCheck:
             return Move(END, None, None)
 
         # if the queen is on the anthill move her
@@ -160,14 +167,33 @@ class AIPlayer(Player):
         #     - If adjacent to a food source, and not carrying, move onto food source and end move
         #     - If carrying food, navigate to closest friendly construction
         #     - If adjacent to construction, and carrying, move onto const. and end move
-        myWorkers = getAntList(currentState, me, (WORKER,))
+        myWorkers = getAntList(currentState, myId, (WORKER,))
         for worker in myWorkers:
             if not (worker.hasMoved):
                 if not (worker.carrying):
-                    workerX = worker.coords[0]
-                    workerY = worker.coords[1]
+                    # calculate the clostest food
+                    distToTunnelFood = stepsToReach(currentState, worker.coords, self.myTunnelFood.coords)
+                    distToHillFood = stepsToReach(currentState, worker.coords, self.myHillFood.coords)
+                    if distToHillFood < distToTunnelFood :
+                        path = createPathToward(currentState, worker.coords,
+                                    self.myHillFood.coords, UNIT_STATS[WORKER][MOVEMENT])
+                    else:
+                        path = createPathToward(currentState, worker.coords,
+                                    self.myTunnelFood.coords, UNIT_STATS[WORKER][MOVEMENT])
+                    return Move(MOVE_ANT, path, None)
+                else:
+                    # calculate the clostest structure
+                    distToTunnel = stepsToReach(currentState, worker.coords, self.myTunnel.coords)
+                    distToHill = stepsToReach(currentState, worker.coords, self.myHill.coords)
+                    if distToHill < distToTunnel :
+                        path = createPathToward(currentState, worker.coords,
+                                    self.myHill.coords, UNIT_STATS[WORKER][MOVEMENT])
+                    else:
+                        path = createPathToward(currentState, worker.coords,
+                                    self.myTunnel.coords, UNIT_STATS[WORKER][MOVEMENT])
+                    return Move(MOVE_ANT, path, None)
 
-                    # calculate the closest food
+
 
         # Region: Drone behavior
         #     - Navigate to the nearest enemy worker (Note, don't send two drones to the same worker)
