@@ -152,14 +152,15 @@ class AIPlayer(Player):
         # Phases:
         #      - Have the AI shoot for 2 workers, a drone, and then another worker.
         #      - Check these numbers each turn and replenish as needed
-        if countWorker < 2:
-            if myInv.foodCount >= 1:
+        # TODO: check Anthill unoccupied on builds
+        if (countWorker < 2):
+            if (myInv.foodCount >= 1):
                 return Move(BUILD, [myInv.getAnthill().coords], WORKER)
-        if countDrone < 1:
+        if (countDrone < 1):
             if myInv.foodCount >= 2:
                 return Move(BUILD, [myInv.getAnthill().coords], DRONE)
-        if countDrone == 1 & countWorker < 3:
-            if myInv.foodCount >= 1:
+        if (countDrone == 1 and countWorker < 3):
+            if (myInv.foodCount >= 1):
                 return Move(BUILD, [myInv.getAnthill().coords], WORKER)
 
         # Region: Worker behavior
@@ -171,7 +172,7 @@ class AIPlayer(Player):
         for worker in myWorkers:
             if not (worker.hasMoved):
                 if not (worker.carrying):
-                    # calculate the clostest food
+                    # calculate the closest food
                     distToTunnelFood = stepsToReach(currentState, worker.coords, self.myTunnelFood.coords)
                     distToHillFood = stepsToReach(currentState, worker.coords, self.myHillFood.coords)
                     if distToHillFood < distToTunnelFood :
@@ -182,7 +183,7 @@ class AIPlayer(Player):
                                     self.myTunnelFood.coords, UNIT_STATS[WORKER][MOVEMENT])
                     return Move(MOVE_ANT, path, None)
                 else:
-                    # calculate the clostest structure
+                    # calculate the closest structure
                     distToTunnel = stepsToReach(currentState, worker.coords, self.myTunnel.coords)
                     distToHill = stepsToReach(currentState, worker.coords, self.myHill.coords)
                     if distToHill < distToTunnel :
