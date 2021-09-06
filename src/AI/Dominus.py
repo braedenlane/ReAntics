@@ -132,10 +132,13 @@ class AIPlayer(Player):
                     self.myTunnelFood = food
                     bestDistSoFar = dist
         if (self.myHillFood == None):
-            if (self.myTunnelFood == foods[0]):
-                self.myHillFood = foods[1]
-            else:
-                self.myHillFood = foods[0]
+            # find the food closest to the hill
+            bestDistSoFar = 1000  # i.e., infinity
+            for food in foods:
+                dist = stepsToReach(currentState, self.myHill.coords, food.coords)
+                if (dist < bestDistSoFar):
+                    self.myHillFood = food
+                    bestDistSoFar = dist
 
         # if I don't have a worker, and am out of food, give up, since food can't be collected
         numAnts = len(myInv.ants)
@@ -187,41 +190,60 @@ class AIPlayer(Player):
         #     - If carrying food, navigate to closest friendly construction
         #     - If adjacent to construction, and carrying, move onto const. and end move
         myWorkers = getAntList(currentState, myId, (WORKER,))
+        legalMoves = listAllLegalMoves(currentState)
         for worker in myWorkers:
             if not (worker.hasMoved):
                 if not (worker.carrying):
-                    # calculate the closest food
-                    distToTunnelFood = stepsToReach(currentState, worker.coords, self.myTunnelFood.coords)
-                    distToHillFood = stepsToReach(currentState, worker.coords, self.myHillFood.coords)
-                    if distToHillFood < distToTunnelFood :
-                        path = createPathToward(currentState, worker.coords,
-                                    self.myHillFood.coords, UNIT_STATS[WORKER][MOVEMENT])
-                        if (getAntAt(currentState, path) is not None):
-                            path = createPathToward(currentState, worker.coords,
-                                                    self.myTunnelFood.coords, UNIT_STATS[WORKER][MOVEMENT])
+                    # if not carrying and on structure, get off of it
+                    if (worker.coords is self.myHill.coords or worker.coords is self.myTunnel.coords):
+                        count = 0
+                        potentialMoves = listAdjacent(worker.coords)
+                        while (count < len(potentialMoves)):
+                            potentialMove = potentialMoves[count]
+                            if(getAntAt(currentState, potentialMove) == None):
+                                return Move(MOVE_ANT, potentialMove, None)
                     else:
-                        path = createPathToward(currentState, worker.coords, self.myTunnelFood.coords, UNIT_STATS[WORKER][MOVEMENT])
-                        if (getAntAt(currentState, path) is not None):
+                        # calculate the closest food
+                        distToTunnelFood = stepsToReach(currentState, worker.coords, self.myTunnelFood.coords)
+                        distToHillFood = stepsToReach(currentState, worker.coords, self.myHillFood.coords)
+                        if distToHillFood < distToTunnelFood:
                             path = createPathToward(currentState, worker.coords,
-                                                    self.myHillFood.coords, UNIT_STATS[WORKER][MOVEMENT])
-                    return Move(MOVE_ANT, path, None)
+                                        self.myHillFood.coords, UNIT_STATS[WORKER][MOVEMENT])
+                            if (getAntAt(currentState, path) is not None):
+                                path = createPathToward(currentState, worker.coords,
+                                                        self.myTunnelFood.coords, UNIT_STATS[WORKER][MOVEMENT])
+                        else:
+                            path = createPathToward(currentState, worker.coords, self.myTunnelFood.coords, UNIT_STATS[WORKER][MOVEMENT])
+                            if (getAntAt(currentState, path) is not None):
+                                path = createPathToward(currentState, worker.coords,
+                                                        self.myHillFood.coords, UNIT_STATS[WORKER][MOVEMENT])
+                        return Move(MOVE_ANT, path, None)
                 else:
-                    # calculate the closest structure
-                    distToTunnel = stepsToReach(currentState, worker.coords, self.myTunnel.coords)
-                    distToHill = stepsToReach(currentState, worker.coords, self.myHill.coords)
-                    if distToHill < distToTunnel :
-                        path = createPathToward(currentState, worker.coords,
-                                    self.myHill.coords, UNIT_STATS[WORKER][MOVEMENT])
-                        if (getAntAt(currentState, path) is not None):
-                            path = createPathToward(currentState, worker.coords,
-                                                    self.myTunnel.coords, UNIT_STATS[WORKER][MOVEMENT])
+                    # if carrying and on food, get off of it
+                    if (worker.coords is self.myHillFood.coords or worker.coords is self.myTunnelFood.coords):
+                        count = 0
+                        potentialMoves = listAdjacent(worker.coords)
+                        while (count < len(potentialMoves)):
+                            potentialMove = potentialMoves[count]
+                            if (getAntAt(currentState, potentialMove) == None):
+                                return Move(MOVE_ANT, potentialMove, None)
                     else:
-                        path = createPathToward(currentState, worker.coords,
-                                    self.myTunnel.coords, UNIT_STATS[WORKER][MOVEMENT])
-                        if (getAntAt(currentState, path) is not None):
+                        # calculate the closest structure
+                        distToTunnel = stepsToReach(currentState, worker.coords, self.myTunnel.coords)
+                        distToHill = stepsToReach(currentState, worker.coords, self.myHill.coords)
+                        if distToHill < distToTunnel:
                             path = createPathToward(currentState, worker.coords,
-                                                    self.myHill.coords, UNIT_STATS[WORKER][MOVEMENT])
-                    return Move(MOVE_ANT, path, None)
+                                        self.myHill.coords, UNIT_STATS[WORKER][MOVEMENT])
+                            if (getAntAt(currentState, path) is not None):
+                                path = createPathToward(currentState, worker.coords,
+                                                        self.myTunnel.coords, UNIT_STATS[WORKER][MOVEMENT])
+                        else:
+                            path = createPathToward(currentState, worker.coords,
+                                        self.myTunnel.coords, UNIT_STATS[WORKER][MOVEMENT])
+                            if (getAntAt(currentState, path) is not None):
+                                path = createPathToward(currentState, worker.coords,
+                                                        self.myHill.coords, UNIT_STATS[WORKER][MOVEMENT])
+                        return Move(MOVE_ANT, path, None)
 
 
 
