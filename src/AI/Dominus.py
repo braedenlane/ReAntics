@@ -96,6 +96,7 @@ class AIPlayer(Player):
 
         myInv = currentState.inventories[myId]
         myAnts = myInv.ants
+        moves = listAllMovementMoves(currentState)
 
         # the first time this method is called, the foods, hill, and tunnel locations
         # need to be recorded in their respective instance variables
@@ -114,15 +115,10 @@ class AIPlayer(Player):
                     self.myTunnelFood = food
                     bestDistSoFar = dist
         if (self.myHillFood == None):
-            foods = getConstrList(currentState, None, (FOOD,))
-            self.myHillFood = foods[0]
-            # find the food closest to the hill
-            bestDistSoFar = 1000  # i.e., infinity
-            for food in foods:
-                dist = stepsToReach(currentState, self.myHill.coords, food.coords)
-                if (dist < bestDistSoFar):
-                    self.myHillFood = food
-                    bestDistSoFar = dist
+            if (self.myTunnelFood == foods[0]):
+                self.myHillFood = foods[1]
+            else:
+                self.myHillFood = foods[0]
 
         # if I don't have a worker, and am out of food, give up, since food can't be collected
         numAnts = len(myInv.ants)
@@ -153,15 +149,16 @@ class AIPlayer(Player):
         #      - Have the AI shoot for 2 workers, a drone, and then another worker.
         #      - Check these numbers each turn and replenish as needed
         # TODO: check Anthill unoccupied on builds
-        if (countWorker < 2):
-            if (myInv.foodCount >= 1):
-                return Move(BUILD, [myInv.getAnthill().coords], WORKER)
-        if (countDrone < 1):
-            if myInv.foodCount >= 2:
-                return Move(BUILD, [myInv.getAnthill().coords], DRONE)
-        if (countDrone == 1 and countWorker < 3):
-            if (myInv.foodCount >= 1):
-                return Move(BUILD, [myInv.getAnthill().coords], WORKER)
+        if (getAntAt(currentState, myInv.getAnthill().coords) is None):
+            if (countWorker < 2):
+                if (myInv.foodCount >= 1):
+                    return Move(BUILD, [myInv.getAnthill().coords], WORKER)
+            if (countDrone < 1):
+                if myInv.foodCount >= 2:
+                    return Move(BUILD, [myInv.getAnthill().coords], DRONE)
+            """if (countDrone == 1 and countWorker < 3):
+                if (myInv.foodCount >= 1):
+                    return Move(BUILD, [myInv.getAnthill().coords], WORKER)"""
 
         # Region: Worker behavior
         #     - If not carrying food, move toward closest food source
@@ -179,8 +176,9 @@ class AIPlayer(Player):
                         path = createPathToward(currentState, worker.coords,
                                     self.myHillFood.coords, UNIT_STATS[WORKER][MOVEMENT])
                     else:
-                        path = createPathToward(currentState, worker.coords,
-                                    self.myTunnelFood.coords, UNIT_STATS[WORKER][MOVEMENT])
+                        path = createPathToward(currentState, worker.coords, self.myTunnelFood.coords, UNIT_STATS[WORKER][MOVEMENT])
+                    if (getAntAt(currentState, path) is not None):
+                        path = listAdjacent(worker.coords)[0]
                     return Move(MOVE_ANT, path, None)
                 else:
                     # calculate the closest structure
@@ -192,6 +190,8 @@ class AIPlayer(Player):
                     else:
                         path = createPathToward(currentState, worker.coords,
                                     self.myTunnel.coords, UNIT_STATS[WORKER][MOVEMENT])
+                    if (getAntAt(currentState, path) is not None):
+                        path = listAdjacent(worker.coords)[0]
                     return Move(MOVE_ANT, path, None)
 
 
@@ -199,7 +199,16 @@ class AIPlayer(Player):
         # Region: Drone behavior
         #     - Navigate to the nearest enemy worker (Note, don't send two drones to the same worker)
         #     - If adjacent to enemy worker, attack
-
+        myDrones = getAntList(currentState, myId, (DRONE,))
+        enemyWorkers = getAntList(currentState, enemyId, (WORKER,))
+        for drone in myDrones:
+            if not (drone.hasMoved):
+                # check if enemy has any workers. If so, attack them. If not, attack the queen
+                if len(enemyWorkers):
+                    path = createPathToward(currentState, drone.coords, enemyWorkers[0].coords, UNIT_STATS[DRONE][MOVEMENT])
+                else:
+                    path = createPathToward(currentState, drone.coords, getAntList(currentState, enemyId, (QUEEN,))[0].coords, UNIT_STATS[DRONE][MOVEMENT])
+                return Move(MOVE_ANT, path, None)
 
 
     ##
