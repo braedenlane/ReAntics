@@ -54,6 +54,10 @@ class AIPlayer(Player):
     # Return: The coordinates of where the construction is to be placed
     ##
     def getPlacement(self, currentState):
+        self.myTunnelFood = None
+        self.myHillFood = None
+        self.myHill = None
+        self.myTunnel = None
         numToPlace = 0
         # implemented by students to return their next move
         if currentState.phase == SETUP_PHASE_1:  # stuff on my side
@@ -144,6 +148,7 @@ class AIPlayer(Player):
         # Counts of my different ants to determine what "phase" we're in
         countWorker = len(getAntList(currentState, myId, (WORKER,)))
         countDrone = len(getAntList(currentState, myId, (DRONE,)))
+        countRSoldier = len(getAntList(currentState, myId, (R_SOLDIER,)))
 
         # Phases:
         #      - Have the AI shoot for 2 workers, a drone, and then another worker.
@@ -156,9 +161,12 @@ class AIPlayer(Player):
             if (countDrone < 1):
                 if myInv.foodCount >= 2:
                     return Move(BUILD, [myInv.getAnthill().coords], DRONE)
-            """if (countDrone == 1 and countWorker < 3):
+            if (countDrone == 1 and countWorker < 3):
                 if (myInv.foodCount >= 1):
-                    return Move(BUILD, [myInv.getAnthill().coords], WORKER)"""
+                    return Move(BUILD, [myInv.getAnthill().coords], WORKER)
+            if (countDrone == 1 and countWorker == 3 and countRSoldier < 1):
+                if (myInv.foodCount >= 2):
+                    return Move(BUILD, [myInv.getAnthill().coords], R_SOLDIER)
 
         # Region: Worker behavior
         #     - If not carrying food, move toward closest food source
@@ -177,7 +185,7 @@ class AIPlayer(Player):
                                     self.myHillFood.coords, UNIT_STATS[WORKER][MOVEMENT])
                     else:
                         path = createPathToward(currentState, worker.coords, self.myTunnelFood.coords, UNIT_STATS[WORKER][MOVEMENT])
-                    if (getAntAt(currentState, path) is not None):
+                    while (getAntAt(currentState, path) is not None):
                         path = listAdjacent(worker.coords)[0]
                     return Move(MOVE_ANT, path, None)
                 else:
@@ -190,7 +198,7 @@ class AIPlayer(Player):
                     else:
                         path = createPathToward(currentState, worker.coords,
                                     self.myTunnel.coords, UNIT_STATS[WORKER][MOVEMENT])
-                    if (getAntAt(currentState, path) is not None):
+                    while (getAntAt(currentState, path) is not None):
                         path = listAdjacent(worker.coords)[0]
                     return Move(MOVE_ANT, path, None)
 
@@ -210,6 +218,17 @@ class AIPlayer(Player):
                     path = createPathToward(currentState, drone.coords, getAntList(currentState, enemyId, (QUEEN,))[0].coords, UNIT_STATS[DRONE][MOVEMENT])
                 return Move(MOVE_ANT, path, None)
 
+        # Region: Ranged Soldier behavior
+        #     - Navigate to the queen and defend her
+        myRSoldiers = getAntList(currentState, myId, (R_SOLDIER,))
+        for rSoldier in myRSoldiers:
+            if not (rSoldier.hasMoved):
+                # Navigate to be beside the queen to defend her, keep moving to constantly attack if needed
+                if (rSoldier.coords == (3,0)):
+                    return Move(MOVE_ANT, [rSoldier.coords], None)
+                else:
+                    path = createPathToward(currentState, rSoldier.coords, (3,0), UNIT_STATS[R_SOLDIER][MOVEMENT])
+                return Move(MOVE_ANT, path, None)
 
     ##
     # getAttack
