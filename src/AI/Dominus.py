@@ -58,6 +58,8 @@ class AIPlayer(Player):
         self.myHillFood = None
         self.myHill = None
         self.myTunnel = None
+        myId = currentState.whoseTurn
+        enemyId = 1 - myId
         numToPlace = 0
         # implemented by students to return their next move
         if currentState.phase == SETUP_PHASE_1:  # stuff on my side
@@ -71,15 +73,26 @@ class AIPlayer(Player):
             for i in range(0, numToPlace):
                 move = None
                 while move == None:
-                    # Choose any x location
-                    x = random.randint(0, 9)
-                    # Choose any y location on enemy side of the board
-                    y = random.randint(6, 9)
-                    # Set the move if this space is empty
-                    if currentState.board[x][y].constr == None and (x, y) not in moves:
-                        move = (x, y)
-                        # Just need to make the space non-empty. So I threw whatever I felt like in there.
-                        currentState.board[x][y].constr == True
+                    xCoords = (0,9)
+                    yCoords = (6,9)
+                    bestDist = 0
+                    bestSpot = (0,0)
+                    enemyInv = currentState.inventories[enemyId]
+                    enemyHill = enemyInv.getAnthill()
+                    enemyTunnel = enemyInv.getTunnels()
+                    for xCoord in xCoords:
+                        for yCoord in yCoords:
+                            distTunnel = stepsToReach(currentState, (xCoord, yCoord), enemyTunnel[0].coords)
+                            distHill = stepsToReach(currentState, (xCoord, yCoord), enemyHill.coords)
+                            if(distTunnel >= 2 and distHill >= 2):
+                                # Set the move if this space is empty
+                                if currentState.board[xCoord][yCoord].constr == None and (xCoord, yCoord) not in moves:
+                                    move = (xCoord, yCoord)
+                                    # Just need to make the space non-empty. So I threw whatever I felt like in there.
+                                    currentState.board[xCoord][yCoord].constr == True
+                                    break
+                        if (currentState.board[xCoord][yCoord].constr == True):
+                            break
                 moves.append(move)
             return moves
         else:
@@ -183,10 +196,14 @@ class AIPlayer(Player):
                     if distToHillFood < distToTunnelFood :
                         path = createPathToward(currentState, worker.coords,
                                     self.myHillFood.coords, UNIT_STATS[WORKER][MOVEMENT])
+                        if (getAntAt(currentState, path) is not None):
+                            path = createPathToward(currentState, worker.coords,
+                                                    self.myTunnelFood.coords, UNIT_STATS[WORKER][MOVEMENT])
                     else:
                         path = createPathToward(currentState, worker.coords, self.myTunnelFood.coords, UNIT_STATS[WORKER][MOVEMENT])
-                    while (getAntAt(currentState, path) is not None):
-                        path = listAdjacent(worker.coords)[0]
+                        if (getAntAt(currentState, path) is not None):
+                            path = createPathToward(currentState, worker.coords,
+                                                    self.myHillFood.coords, UNIT_STATS[WORKER][MOVEMENT])
                     return Move(MOVE_ANT, path, None)
                 else:
                     # calculate the closest structure
@@ -195,11 +212,15 @@ class AIPlayer(Player):
                     if distToHill < distToTunnel :
                         path = createPathToward(currentState, worker.coords,
                                     self.myHill.coords, UNIT_STATS[WORKER][MOVEMENT])
+                        if (getAntAt(currentState, path) is not None):
+                            path = createPathToward(currentState, worker.coords,
+                                                    self.myTunnel.coords, UNIT_STATS[WORKER][MOVEMENT])
                     else:
                         path = createPathToward(currentState, worker.coords,
                                     self.myTunnel.coords, UNIT_STATS[WORKER][MOVEMENT])
-                    while (getAntAt(currentState, path) is not None):
-                        path = listAdjacent(worker.coords)[0]
+                        if (getAntAt(currentState, path) is not None):
+                            path = createPathToward(currentState, worker.coords,
+                                                    self.myHill.coords, UNIT_STATS[WORKER][MOVEMENT])
                     return Move(MOVE_ANT, path, None)
 
 
