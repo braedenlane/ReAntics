@@ -7,7 +7,7 @@ from GameState import *
 from AIPlayerUtils import *
 import random
 import sys
-sys.path.append("..")  #so other modules can be found in parent dir
+sys.path.append("..")  #so other modules can be found in parent directory
 
 # Needs methods:
 # __init__ constructor
@@ -31,16 +31,14 @@ class AIPlayer(Player):
     ##
     def __init__(self, inputPlayerId):
         super(AIPlayer, self).__init__(inputPlayerId, "Dominus")
-        # the coordinates of the agent's food closest to the tunnel and tunnel will be stored in these
+        # the coordinates of the agent's food closest to the tunnel and tunnel will be
+        # stored in these
         # variables (see getMove() below)
         # coordinates of the agent's food closest to the hill and hill will be stored as well
         self.myTunnelFood = None
-        self.myHillFood = None
-        self.myHill = None
         self.myTunnel = None
         self.myTunnelWorker = None
-        self.myHillWorker = None
-        self.switchHillWorker = False
+
 
     ##
     # getPlacement
@@ -58,23 +56,20 @@ class AIPlayer(Player):
     ##
     def getPlacement(self, currentState):
         self.myTunnelFood = None
-        self.myHillFood = None
-        self.myHill = None
         self.myTunnel = None
         self.myTunnelWorker = None
-        self.myHillWorker = None
-        self.switchHillWorker = False
         myId = currentState.whoseTurn
         enemyId = 1 - myId
         numToPlace = 0
         # implemented by students to return their next move
         if currentState.phase == SETUP_PHASE_1:  # stuff on my side
-            # Ideal location for the ant hill and tunnel, minimizing the distance to any food source location
+            # Ideal location for the ant hill and tunnel, minimizing the distance
+            # to any food source location
             # Grass placed defensively to protect ant hill, also placed to reduce food distance
             return [(2, 1), (7, 2), (0, 3), (1, 3), (2, 3),
                     (3, 3), (4, 3), (5, 3), (6, 3), (5, 0), (9,0)]
         elif currentState.phase == SETUP_PHASE_2:  # stuff on foe's side
-            # Just place food randomly
+            # Code used from FoodGatherer.py to randomly place food
             numToPlace = 2
             moves = []
             for i in range(0, numToPlace):
@@ -93,6 +88,7 @@ class AIPlayer(Player):
             return moves
         else:
             return [(0, 0)]
+
 
     ##
     # getMove
@@ -115,8 +111,6 @@ class AIPlayer(Player):
         # need to be recorded in their respective instance variables
         if (self.myTunnel == None):
             self.myTunnel = getConstrList(currentState, myId, (TUNNEL,))[0]
-        if (self.myHill == None):
-            self.myHill = getConstrList(currentState, myId, (ANTHILL,))[0]
         if (self.myTunnelFood == None):
             foods = getCurrPlayerFood(self, currentState)
             self.myTunnelFood = foods[0]
@@ -127,16 +121,12 @@ class AIPlayer(Player):
                 if (dist < bestDistSoFar):
                     self.myTunnelFood = food
                     bestDistSoFar = dist
-        if (self.myHillFood == None):
-            if(self.myTunnelFood == foods[0]):
-                self.myHillFood = foods[1]
-            else:
-                self.myHillFood = foods[0]
 
         # if I don't have a worker, and am out of food, give up, since food can't be collected
         numAnts = len(myInv.ants)
         if (numAnts == 1 & myInv.foodCount == 0):
             return Move(END, None, None)
+
         if((len(getAntList(currentState, myId, (WORKER,))) >= 1)):
             self.myTunnelWorker = getAntList(currentState, myId, (WORKER,))[0]
 
@@ -166,10 +156,10 @@ class AIPlayer(Player):
         countDrone = len(getAntList(currentState, myId, (DRONE,)))
         countRSoldier = len(getAntList(currentState, myId, (R_SOLDIER,)))
 
+
         # Phases:
         #      - Have the AI shoot for a worker, a drone, and then a ranged soldier
         #      - Check these numbers each turn and replenish as needed
-        # TODO: check Anthill unoccupied on builds
         if (getAntAt(currentState, myInv.getAnthill().coords) is None):
             if (countWorker < 1):
                 if (myInv.foodCount >= 1):
@@ -181,49 +171,57 @@ class AIPlayer(Player):
                 if (myInv.foodCount >= 2):
                     return Move(BUILD, [myInv.getAnthill().coords], R_SOLDIER)
 
+
         # Region: Worker behavior
         #     - If not carrying food, move toward food source
         #     - If adjacent to a food source, and not carrying, move onto food source and end move
         #     - If carrying food, navigate to tunnel
         #     - If adjacent to construction, and carrying, move onto const. and end move
-        myWorkers = getAntList(currentState, myId, (WORKER,))
-
         if (not self.myTunnelWorker == None):
             if (not self.myTunnelWorker.hasMoved):
                 if (not self.myTunnelWorker.carrying):
-                    path = createPathToward(currentState, self.myTunnelWorker.coords, self.myTunnelFood.coords, UNIT_STATS[WORKER][MOVEMENT])
+                    path = createPathToward(currentState, self.myTunnelWorker.coords,
+                                        self.myTunnelFood.coords, UNIT_STATS[WORKER][MOVEMENT])
                     return Move(MOVE_ANT, path, None)
                 else:
-                    path = createPathToward(currentState, self.myTunnelWorker.coords, self.myTunnel.coords,
-                                            UNIT_STATS[WORKER][MOVEMENT])
+                    path = createPathToward(currentState, self.myTunnelWorker.coords,
+                                        self.myTunnel.coords, UNIT_STATS[WORKER][MOVEMENT])
                     return Move(MOVE_ANT, path, None)
 
 
         # Region: Drone behavior
-        #     - Navigate to the nearest enemy worker (Note, don't send two drones to the same worker)
+        #     - Navigate to the nearest enemy worker
+        #           (Note, don't send two drones to the same worker)
         #     - If adjacent to enemy worker, attack
+        #     - If no workers, go to queen and attack
         myDrones = getAntList(currentState, myId, (DRONE,))
         enemyWorkers = getAntList(currentState, enemyId, (WORKER,))
         for drone in myDrones:
             if not (drone.hasMoved):
-                # check if enemy has any workers. If so, attack them. If not, attack the queen
                 if len(enemyWorkers):
-                    path = createPathToward(currentState, drone.coords, enemyWorkers[0].coords, UNIT_STATS[DRONE][MOVEMENT])
+                    path = createPathToward(currentState, drone.coords,
+                                            enemyWorkers[0].coords, UNIT_STATS[DRONE][MOVEMENT])
                 else:
-                    path = createPathToward(currentState, drone.coords, getAntList(currentState, enemyId, (QUEEN,))[0].coords, UNIT_STATS[DRONE][MOVEMENT])
+                    path = createPathToward(currentState, drone.coords,
+                                            getAntList(currentState, enemyId, (QUEEN,))[0].coords,
+                                            UNIT_STATS[DRONE][MOVEMENT])
                 return Move(MOVE_ANT, path, None)
+
 
         # Region: Ranged Soldier behavior
         #     - Navigate to the queen and defend her
         myRSoldiers = getAntList(currentState, myId, (R_SOLDIER,))
         for rSoldier in myRSoldiers:
             if not (rSoldier.hasMoved):
-                # Navigate to be beside the queen to defend her, keep moving to constantly attack if needed
+                # Navigate to be beside the queen to defend her, keep moving
+                # to constantly attack if needed
                 if (rSoldier.coords == (3,3)):
                     return Move(MOVE_ANT, [rSoldier.coords], None)
                 else:
-                    path = createPathToward(currentState, rSoldier.coords, (3,3), UNIT_STATS[R_SOLDIER][MOVEMENT])
+                    path = createPathToward(currentState, rSoldier.coords,
+                                            (3,3), UNIT_STATS[R_SOLDIER][MOVEMENT])
                 return Move(MOVE_ANT, path, None)
+
 
     ##
     # getAttack
