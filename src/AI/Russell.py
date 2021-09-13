@@ -91,14 +91,23 @@ class AIPlayer(Player):
     # Return: The Move to be made
     ##
     def getMove(self, currentState):
-        moves = listAllLegalMoves(currentState)
+        moves = []
+        moves.extend(listAllMovementMoves(currentState))
+        if (len(moves) == 0):
+            moves.append(Move(END, None, None))
+        moves.extend(listAllBuildMoves(currentState))
         states = []
         nodes = []
         count = 0
+
+        # rootNode is the node relating to the current state. Has no parent or previous move
         rootNode = self.getNode(None, currentState, 0, None)
+
+        # get a list of valid states based on legal moves
         for move in moves:
             states.append(getNextState(currentState, move))
 
+        # develop a node list based on the moves and states lists
         for move in moves:
             toAdd = self.getNode(moves[count], states[count], 1, rootNode)
             nodes.append(toAdd)
@@ -120,7 +129,9 @@ class AIPlayer(Player):
     # Return: the score the the gamestate (0.0 is lowest, 1.0 is highest)
     ##
     def utility(self, state):
+
         myInv = getCurrPlayerInventory(state)
+        enemInv = getEnemyInv(self, state)
 
         # anything below 0.5 is not ideal
         rating = 0.0
@@ -128,18 +139,96 @@ class AIPlayer(Player):
         # add .07 for each food in inventory
         rating += 0.07 * myInv.foodCount
 
-        # add .06 for each worker up to two
-        rating += 0.06 * len(getAntList(state, state.whoseTurn, (WORKER,)))
+        # add .075 for each worker we have, up to 2 (favor worker over just keeping a food)
+        if(len(getAntList(state, state.whoseTurn, (WORKER,))) <= 2):
+            rating += 0.075 * len(getAntList(state, state.whoseTurn, (WORKER,)))
 
-        # add .15 for each drone it has over the enemy
-        rating += 0.15 * (len(getAntList(state, state.whoseTurn, (DRONE,)))-\
-                            len(getAntList(state, 1-state.whoseTurn,(DRONE,))))
-        if(rating > 1.0):
-            return 1.0
-        elif(rating < 0.0):
-            return 0.0
-        else:
-            return rating
+        # add .2 if we have a drone
+        if(len(getAntList(state, state.whoseTurn, (DRONE,))) == 1):
+            rating += 0.2
+
+        #add .25 if we have a soldier
+        if(len(getAntList(state, state.whoseTurn, (SOLDIER,))) == 1):
+            rating += 0.25
+
+        # Evaluate how close this state is to adding a piece of food
+        for ant in myInv.ants:
+
+            # Queen behavior (keep off anthill)
+            if(ant.type == QUEEN):
+                if(myInv.getAnthill().coords == ant.coords):
+                    return 0.0
+
+            # Worker behavior
+            if(ant.type == WORKER):
+                stepsTilFood = 0
+                stepsTilConstr = 0
+
+                # calculate the closest food source on my side
+                if not (ant.carrying):
+                    stepsTilFood = 100 # ie infinity
+                    stepsTilConstr = 100 # ie infinity
+                    foods = getCurrPlayerFood(self, state)
+                    for food in foods:
+                        potentialSteps = stepsToReach(state, ant.coords, food.coords)
+                        if (potentialSteps < stepsTilFood):
+                            stepsTilFood = potentialSteps
+                            foodSource = food
+
+                    # calculate the closest structure from foodSource coords
+                    constrs = []
+                    constrs.append(myInv.getAnthill())
+                    constrs.append(myInv.getTunnels()[0])
+                    for constr in constrs:
+                        potentialSteps = stepsToReach(state, foodSource.coords, constr.coords)
+                        if (potentialSteps < stepsTilConstr):
+                            stepsTilConstr = potentialSteps
+
+
+                else:
+                    stepsTilFood = 0
+                    stepsTilConstr = 100  # ie infinity
+                    # calculate the closest structure from ant coords
+                    constrs = []
+                    constrs.append(myInv.getTunnels()[0])
+                    constrs.append(myInv.getAnthill())
+                    for constr in constrs:
+                        potentialSteps = stepsToReach(state, ant.coords, constr.coords)
+                        if (potentialSteps < stepsTilConstr):
+                            stepsTilConstr = potentialSteps
+
+                stepsToAddFood = stepsTilFood + stepsTilConstr
+
+                rating -= 0.005 * stepsToAddFood
+
+            # Drone behavior
+
+            if(ant.type == DRONE):
+                shortestPathToEnemWorker = 0
+                if not (len(getAntList(state, 1 - state.whoseTurn, (WORKER,))) == 0):
+                    shortestPathToEnemWorker = 100 # ie infinity
+                    for enemAnt in enemInv.ants:
+                        if(enemAnt.type == WORKER):
+                            potentialSteps = stepsToReach(state, ant.coords, enemAnt.coords)
+                            if(potentialSteps < shortestPathToEnemWorker):
+                                shortestPathToEnemWorker = potentialSteps
+
+                rating -= 0.005 * shortestPathToEnemWorker
+
+            # Soldier behavior
+
+            if(ant.type == SOLDIER):
+                shortestPathToEnemQueen = 100 # ie infinity
+                for enemAnt in enemInv.ants:
+                    if (enemAnt.type == QUEEN):
+                        potentialSteps = stepsToReach(state, ant.coords, enemAnt.coords)
+                        if (potentialSteps < shortestPathToEnemQueen):
+                            shortestPathToEnemQueen = potentialSteps
+
+                rating -= 0.005 * shortestPathToEnemQueen
+
+        # max rating possible is 1.34, so divide rating by that to get a score between 0 and 1.
+        return (rating / 1.34)
 
     ##
     # getNode
@@ -182,7 +271,7 @@ class AIPlayer(Player):
 
         bestNode = nodeList[0]
         for node in nodeList:
-            if (node["evaluation"] < bestNode["evaluation"]):
+            if (node["evaluation"] > bestNode["evaluation"]):
                 bestNode = node
         bestMove = bestNode["move"]
         return bestMove
