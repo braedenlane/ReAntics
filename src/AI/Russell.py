@@ -92,12 +92,18 @@ class AIPlayer(Player):
     ##
     def getMove(self, currentState):
         moves = listAllLegalMoves(currentState)
-        selectedMove = moves[random.randint(0, len(moves) - 1)];
+        states = []
+        nodes = []
+        count = 0
+        rootNode = getNode(currentState, None, 0, None)
+        for move in moves:
+            states.append(getNextState(currentState, move))
 
-        # don't do a build move if there are already 3+ ants
-        numAnts = len(currentState.inventories[currentState.whoseTurn].ants)
-        while (selectedMove.moveType == BUILD and numAnts >= 3):
-            selectedMove = moves[random.randint(0, len(moves) - 1)];
+        for move in move:
+            nodes.append(getNode(state[count], move[count], 1, rootNode))
+            count+=1
+
+        selectedMove = bestMove(nodes)
 
         return selectedMove
 
@@ -108,23 +114,22 @@ class AIPlayer(Player):
     #   based on how good it thinks the state is. 0 is lowest, 1 is highest
     #
     # Parameters:
-    #   self - the current player
-    #   currentState - the current gameState
+    #   state - the state to be examined
     #
     # Return: the score the the gamestate (0.0 is lowest, 1.0 is highest)
     ##
-    def utility(self, currentState):
+    def utility(self, state):
         # anything below 0.5 is not ideal
         rating = 0.0
 
         # add .07 for each food in inventory
-        rating += 0.07 * getCurrPlayerFood(self,currentState)
+        rating += 0.07 * getCurrPlayerFood(self, currentState)
 
         # add .06 for each worker up to two
         rating += 0.06 * len(getAntList(currentState, currentState.whoseTurn, (WORKER,)))
 
         # add .15 for each drone it has over the enemy
-        rating += 0.15 * (len(getAntList(currentState, currentState.whoseTurn,(DRONE,)))-\
+        rating += 0.15 * (len(getAntList(currentState, currentState.whoseTurn, (DRONE,)))-\
                             len(getAntList(currentState, 1-currentState.whoseTurn,(DRONE,))))
         if(rating > 1.0):
             return 1.0
@@ -139,18 +144,18 @@ class AIPlayer(Player):
     #
     #
     # Parameters:
-    #
-    #
-    #
+    #   move - the move used in the parent node to reach this node
+    #   state - the state that would be reached in this node
+    #   depth - number of moves required to reach this node from the agent's true current state
+    #   parentNode - a reference to the parent node of this node
     #
     # Return:
     ##
-    def getNode(self, currentState, move, depth, parentNode):
-        eval = utility(self)
-        childState = getNextState(currentState, move)
+    def getNode(self, move, state, depth, parentNode):
+        eval = utility(state)
         node = {
             "move": move,
-            "childState": childState,
+            "state": state,
             "depth": depth,
             "evaluation": eval,
             "parentNode": parentNode
@@ -160,7 +165,7 @@ class AIPlayer(Player):
     ##
     # bestMove
     # Description: Finds the best move in the given node list by checking
-    #   the evaluation at the depth of 5 and returns the move required to
+    #   the evaluation at the depth of 1 and returns the move required to
     #   get there
     #
     # Parameters:
@@ -168,8 +173,17 @@ class AIPlayer(Player):
     #
     # Return: the best move we found
     ##
-    def bestMove(nodeList):
-        return nodeList[0].move
+    def bestMove(self, nodeList):
+        if (nodeList == None):
+            return None
+
+        bestNode = nodeList[0]
+        for node in nodeList:
+            if (node["evaluation"] < bestNode["evaluation"]):
+                bestNode = node
+        bestMove = bestNode["move"]
+        return bestMove
+
 
 
     ##
