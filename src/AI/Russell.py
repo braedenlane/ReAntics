@@ -101,8 +101,52 @@ class AIPlayer(Player):
 
         return selectedMove
 
+
+    ##
+    # utility
+    # Description: Examines the gamestate and returns a rating from 0 to 1
+    #   based on how good it thinks the state is. 0 is lowest, 1 is highest
+    #
+    # Parameters:
+    #   self - the current player
+    #   currentState - the current gameState
+    #
+    # Return: the score the the gamestate (0.0 is lowest, 1.0 is highest)
+    ##
+    def utility(self, currentState):
+        # anything below 0.5 is not ideal
+        rating = 0.0
+
+        # add .07 for each food in inventory
+        rating += 0.07 * getCurrPlayerFood(self,currentState)
+
+        # add .06 for each worker up to two
+        rating += 0.06 * len(getAntList(currentState, currentState.whoseTurn, (WORKER,)))
+
+        # add .15 for each drone it has over the enemy
+        rating += 0.15 * (len(getAntList(currentState, currentState.whoseTurn,(DRONE,)))-\
+                            len(getAntList(currentState, 1-currentState.whoseTurn,(DRONE,))))
+        if(rating > 1.0):
+            return 1.0
+        elif(rating < 0.0):
+            return 0.0
+        else:
+            return rating
+
+    ##
+    # getNode
+    # Description:
+    #
+    #
+    # Parameters:
+    #
+    #
+    #
+    #
+    # Return:
+    ##
     def getNode(self, currentState, move, depth, parentNode):
-        eval = utility()
+        eval = utility(self)
         childState = getNextState(currentState, move)
         node = {
             "move": move,
@@ -113,8 +157,19 @@ class AIPlayer(Player):
         }
         return node
 
-    def utility(self):
-
+    ##
+    # bestMove
+    # Description: Finds the best move in the given node list by checking
+    #   the evaluation at the depth of 5 and returns the move required to
+    #   get there
+    #
+    # Parameters:
+    #   nodeList - a list of nodes
+    #
+    # Return: the best move we found
+    ##
+    def bestMove(nodeList):
+        return nodeList[0].move
 
 
     ##
