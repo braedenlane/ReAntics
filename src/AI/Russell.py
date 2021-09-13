@@ -95,15 +95,16 @@ class AIPlayer(Player):
         states = []
         nodes = []
         count = 0
-        rootNode = getNode(currentState, None, 0, None)
+        rootNode = self.getNode(None, currentState, 0, None)
         for move in moves:
             states.append(getNextState(currentState, move))
 
-        for move in move:
-            nodes.append(getNode(state[count], move[count], 1, rootNode))
+        for move in moves:
+            toAdd = self.getNode(moves[count], states[count], 1, rootNode)
+            nodes.append(toAdd)
             count+=1
 
-        selectedMove = bestMove(nodes)
+        selectedMove = self.bestMove(nodes)
 
         return selectedMove
 
@@ -119,18 +120,20 @@ class AIPlayer(Player):
     # Return: the score the the gamestate (0.0 is lowest, 1.0 is highest)
     ##
     def utility(self, state):
+        myInv = getCurrPlayerInventory(state)
+
         # anything below 0.5 is not ideal
         rating = 0.0
 
         # add .07 for each food in inventory
-        rating += 0.07 * getCurrPlayerFood(self, currentState)
+        rating += 0.07 * myInv.foodCount
 
         # add .06 for each worker up to two
-        rating += 0.06 * len(getAntList(currentState, currentState.whoseTurn, (WORKER,)))
+        rating += 0.06 * len(getAntList(state, state.whoseTurn, (WORKER,)))
 
         # add .15 for each drone it has over the enemy
-        rating += 0.15 * (len(getAntList(currentState, currentState.whoseTurn, (DRONE,)))-\
-                            len(getAntList(currentState, 1-currentState.whoseTurn,(DRONE,))))
+        rating += 0.15 * (len(getAntList(state, state.whoseTurn, (DRONE,)))-\
+                            len(getAntList(state, 1-state.whoseTurn,(DRONE,))))
         if(rating > 1.0):
             return 1.0
         elif(rating < 0.0):
@@ -152,7 +155,7 @@ class AIPlayer(Player):
     # Return:
     ##
     def getNode(self, move, state, depth, parentNode):
-        eval = utility(state)
+        eval = self.utility(state)
         node = {
             "move": move,
             "state": state,
