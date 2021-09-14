@@ -59,7 +59,8 @@ class AIPlayer(Player):
                     # Set the move if this space is empty
                     if currentState.board[x][y].constr == None and (x, y) not in moves:
                         move = (x, y)
-                        # Just need to make the space non-empty. So I threw whatever I felt like in there.
+                        # Just need to make the space non-empty. So I threw whatever
+                        # I felt like in there.
                         currentState.board[x][y].constr == True
                 moves.append(move)
             return moves
@@ -76,7 +77,8 @@ class AIPlayer(Player):
                     # Set the move if this space is empty
                     if currentState.board[x][y].constr == None and (x, y) not in moves:
                         move = (x, y)
-                        # Just need to make the space non-empty. So I threw whatever I felt like in there.
+                        # Just need to make the space non-empty. So I threw whatever
+                        # I felt like in there.
                         currentState.board[x][y].constr == True
                 moves.append(move)
             return moves
