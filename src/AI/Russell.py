@@ -234,9 +234,25 @@ class AIPlayer(Player):
         return (rating / 1.34)
 
     ##
+    # expandNode
+    # Description:
+    # Creates new nodes based on a node that is passed in as a parameter
+    #
+    # Parameters:
+    #   parentNode - the node to expand and create frontier/children nodes off of
+    ##
+    def expandNode(self, parentNode):
+        moves = getAllLegalMoves(parentNode["state"])
+        ret = []
+        for move in moves:
+            ret.append(self.getNode(move, getNextState(parentNode["state"], move),
+                         parentNode["depth"] + 1, parentNode))
+        return ret
+
+    ##
     # getNode
     # Description:
-    #
+    # Creates and returns a "node" dictionary containing the information a node would include
     #
     # Parameters:
     #   move - the move used in the parent node to reach this node
@@ -245,6 +261,7 @@ class AIPlayer(Player):
     #   parentNode - a reference to the parent node of this node
     #
     # Return:
+    # the "node" dictionary
     ##
     def getNode(self, move, state, depth, parentNode):
         eval = self.utility(state)
