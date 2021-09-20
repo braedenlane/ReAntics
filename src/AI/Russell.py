@@ -95,31 +95,73 @@ class AIPlayer(Player):
     # Return: The Move to be made
     ##
     def getMove(self, currentState):
-        moves = []
-        moves.extend(listAllMovementMoves(currentState))
-        if (len(moves) == 0):
-            moves.append(Move(END, None, None))
-        moves.extend(listAllBuildMoves(currentState))
-        states = []
-        nodes = []
-        count = 0
+        frontierNodes = []
+        expandedNodes = []
 
-        # rootNode is the node relating to the current state. Has no parent or previous move
         rootNode = self.getNode(None, currentState, 0, None)
 
-        # get a list of valid states based on legal moves
-        for move in moves:
-            states.append(getNextState(currentState, move))
+        frontierNodes.append(rootNode)
 
-        # develop a node list based on the moves and states lists
-        for move in moves:
-            toAdd = self.getNode(moves[count], states[count], 1, rootNode)
-            nodes.append(toAdd)
-            count += 1
+        # Give it four iterations to get to the goal
+        for i in range(5):
+            # Select node with the best score from frontierNodes
+            bestNode = None
+            lowestEval = 10000
+            for node in frontierNodes:
+                if(node["evaluation"] < lowestEval):
+                    bestNode = node
+                    lowestEval = node["evaluation"]
 
-        selectedMove = self.bestMove(nodes)
+            # Expand bestNode selected
+            frontierNodes.remove(bestNode)
+            expandedNodes.append(bestNode)
+            children = self.expandNode(bestNode)
 
-        return selectedMove
+            # add children to frontierNodes list
+            frontierNodes.extend(children)
+
+        # Choose the move with the lowest score in frontierNodes and trace back to parent
+        bestNode = None
+        lowestEval = 10000
+        for potentialNode in frontierNodes:
+            if (potentialNode["evaluation"] < lowestEval):
+                bestNode = potentialNode
+                lowestEval = potentialNode["evaluation"]
+
+        # iterate back to the parent with depth of 1
+        while(bestNode["depth"] != 1):
+            bestNode = bestNode["parentNode"]
+
+        return bestNode["move"]
+
+
+
+        #### OLD getMove IMPLEMENTATION
+        # moves = []
+        # moves.extend(listAllMovementMoves(currentState))
+        # if (len(moves) == 0):
+        #     moves.append(Move(END, None, None))
+        # moves.extend(listAllBuildMoves(currentState))
+        # states = []
+        # nodes = []
+        # count = 0
+        #
+        # # rootNode is the node relating to the current state. Has no parent or previous move
+        # rootNode = self.getNode(None, currentState, 0, None)
+        #
+        # # get a list of valid states based on legal moves
+        # for move in moves:
+        #     states.append(getNextState(currentState, move))
+        #
+        # # develop a node list based on the moves and states lists
+        # for move in moves:
+        #     toAdd = self.getNode(moves[count], states[count], 1, rootNode)
+        #     nodes.append(toAdd)
+        #     count += 1
+        #
+        # selectedMove = self.bestMove(nodes)
+        #
+        # return selectedMove
 
     ##
     # utility
@@ -173,7 +215,7 @@ class AIPlayer(Player):
                     stepsTilConstr = 100  # ie infinity
                     foods = getCurrPlayerFood(self, state)
                     for food in foods:
-                        potentialSteps = stepsToReach(state, ant.coords, food.coords)
+                        potentialSteps = approxDist(ant.coords, food.coords)
                         if (potentialSteps < stepsTilFood):
                             stepsTilFood = potentialSteps
                             foodSource = food
@@ -183,7 +225,7 @@ class AIPlayer(Player):
                     constrs.append(myInv.getAnthill())
                     constrs.append(myInv.getTunnels()[0])
                     for constr in constrs:
-                        potentialSteps = stepsToReach(state, foodSource.coords, constr.coords)
+                        potentialSteps = approxDist(foodSource.coords, constr.coords)
                         if (potentialSteps < stepsTilConstr):
                             stepsTilConstr = potentialSteps
 
@@ -196,7 +238,7 @@ class AIPlayer(Player):
                     constrs.append(myInv.getTunnels()[0])
                     constrs.append(myInv.getAnthill())
                     for constr in constrs:
-                        potentialSteps = stepsToReach(state, ant.coords, constr.coords)
+                        potentialSteps = approxDist(ant.coords, constr.coords)
                         if (potentialSteps < stepsTilConstr):
                             stepsTilConstr = potentialSteps
 
@@ -212,7 +254,7 @@ class AIPlayer(Player):
                     shortestPathToEnemWorker = 100  # ie infinity
                     for enemAnt in enemInv.ants:
                         if (enemAnt.type == WORKER):
-                            potentialSteps = stepsToReach(state, ant.coords, enemAnt.coords)
+                            potentialSteps = approxDist(ant.coords, enemAnt.coords)
                             if (potentialSteps < shortestPathToEnemWorker):
                                 shortestPathToEnemWorker = potentialSteps
 
@@ -224,14 +266,14 @@ class AIPlayer(Player):
                 shortestPathToEnemQueen = 100  # ie infinity
                 for enemAnt in enemInv.ants:
                     if (enemAnt.type == QUEEN):
-                        potentialSteps = stepsToReach(state, ant.coords, enemAnt.coords)
+                        potentialSteps = approxDist(ant.coords, enemAnt.coords)
                         if (potentialSteps < shortestPathToEnemQueen):
                             shortestPathToEnemQueen = potentialSteps
 
                 rating -= 0.005 * shortestPathToEnemQueen
 
         # max rating possible is 1.34, so divide rating by that to get a score between 0 and 1.
-        return (rating / 1.34)
+        return 1 / ((rating + .0001) / 1.34)
 
     ##
     # expandNode
@@ -242,7 +284,7 @@ class AIPlayer(Player):
     #   parentNode - the node to expand and create frontier/children nodes off of
     ##
     def expandNode(self, parentNode):
-        moves = getAllLegalMoves(parentNode["state"])
+        moves = listAllLegalMoves(parentNode["state"])
         ret = []
         for move in moves:
             ret.append(self.getNode(move, getNextState(parentNode["state"], move),
