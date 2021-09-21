@@ -102,8 +102,8 @@ class AIPlayer(Player):
 
         frontierNodes.append(rootNode)
 
-        # Give it four iterations to get to the goal
-        for i in range(10):
+        # Give it hundred iterations to get to the goal
+        for i in range(75):
             # Select node with the best score from frontierNodes
             bestNode = None
             lowestEval = 10000
@@ -234,6 +234,19 @@ class AIPlayer(Player):
                     or queenCoords == tunnelCoords \
                     or queenCoords == myFood.coords:
                 estimate += 2
+
+            drones = []
+            enemWorkers = []
+            for ant in myInv.ants:
+                if(ant.type == DRONE):
+                    drones.append(ant)
+            if(len(drones) == 1):
+                estimate -= 30
+                for enemAnt in enemInv.ants:
+                    if(enemAnt.type == WORKER):
+                        enemWorkers.append(enemAnt)
+                if(len(enemWorkers) >= 1):
+                    estimate += approxDist(drones[0].coords, enemWorkers[0].coords)
 
         return estimate
 
