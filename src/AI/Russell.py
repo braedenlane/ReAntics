@@ -103,7 +103,7 @@ class AIPlayer(Player):
         frontierNodes.append(rootNode)
 
         # Give it hundred iterations to get to the goal
-        for i in range(75):
+        for i in range(50):
             # Select node with the best score from frontierNodes
             bestNode = None
             lowestEval = 10000
@@ -119,6 +119,7 @@ class AIPlayer(Player):
 
             # add children to frontierNodes list
             frontierNodes.extend(children)
+            # frontierNodes.sort(key=self.getEval)
 
         # Choose the move with the lowest score in frontierNodes and trace back to parent
         bestNode = None
@@ -161,6 +162,9 @@ class AIPlayer(Player):
         #
         # return selectedMove
 
+    def getEval(self, dict):
+        return dict["evaluation"]
+
     ##
     # utility
     # Description: Examines the gamestate and estimates how many turns will be
@@ -178,34 +182,38 @@ class AIPlayer(Player):
 
         estimate = 1000
 
-        # just a queen is 1000 aka we dont want this. we lose with just queen
+        # Filling our ant arrays that we will need for our estimations
+        numWorkers = 0
+        workers = []
+        drones = []
+        enemWorkers = []
+        for ant in myInv.ants:
+            if (ant.type == DRONE):
+                drones.append(ant)
+            elif (ant.type == WORKER):
+                workers.append(ant)
+                numWorkers += 1
 
-        # 1 workers is 2 * 11-food * 2
-        # 2 workers divides that by 2
-        workers = getAntList(state, 1, [WORKER, ])
-        numWorkers = len(workers)
+        for enemAnt in enemInv.ants:
+            if (enemAnt.type == WORKER):
+                enemWorkers.append(enemAnt)
 
         tunnelCoords = getConstrList(state, state.whoseTurn, [TUNNEL, ])[0].coords
+
+        # just a queen is 1000 aka we dont want this. we lose with just queen
 
         foods = getConstrList(state, 2, [FOOD, ])
         if len(foods) > 1:
 
-            closerDropOffCoords = myInv.getAnthill().coords
             myFood = foods[0]
             max = 1000
             for food in foods:
-                steps = approxDist(food.coords, myInv.getAnthill().coords)
-                if steps < max:
-                    max = steps
-                    myFood = food
-                    closerDropOffCoords = myInv.getAnthill().coords
                 steps = approxDist(food.coords, tunnelCoords)
                 if steps < max:
                     max = steps
                     myFood = food
-                    closerDropOffCoords = tunnelCoords
 
-            dist = approxDist(closerDropOffCoords, myFood.coords)
+            dist = approxDist(tunnelCoords, myFood.coords)
 
             if numWorkers == 0:
                 estimate = 1000
@@ -213,20 +221,8 @@ class AIPlayer(Player):
                 estimate = (11 - myInv.foodCount) * dist * 2
 
             for worker in workers:
-                if worker.carrying:
-                    estimate -= dist
-
-            for worker in workers:
-                x = worker.coords[0]
-                y = worker.coords[1]
-                if getAntAt(state, (x - 1, y)) is DRONE:
-                    estimate += 3
-                if not getAntAt(state, (x, y - 1)) is DRONE:
-                    estimate += 3
-                if not getAntAt(state, (x + 1, y)) is DRONE:
-                    estimate += 3
-                if not getAntAt(state, (x, y + 1)) is DRONE:
-                    estimate += 3
+                if not worker.carrying:
+                    estimate += approxDist(worker.coords, myFood.coords)
 
             # moving queen off hill and tunnel and food reduces time by 2
             queenCoords = myInv.getQueen().coords
@@ -235,18 +231,13 @@ class AIPlayer(Player):
                     or queenCoords == myFood.coords:
                 estimate += 2
 
-            drones = []
-            enemWorkers = []
-            for ant in myInv.ants:
-                if(ant.type == DRONE):
-                    drones.append(ant)
-            if(len(drones) == 1):
+            if (len(drones) == 1):
                 estimate -= 30
-                for enemAnt in enemInv.ants:
-                    if(enemAnt.type == WORKER):
-                        enemWorkers.append(enemAnt)
-                if(len(enemWorkers) >= 1):
+                if (len(enemWorkers) >= 1):
                     estimate += approxDist(drones[0].coords, enemWorkers[0].coords)
+                elif(len(enemWorkers) == 0):
+                    estimate -= 10
+                    estimate += approxDist(drones[0].coords, enemInv.getAnthill().coords)
 
         return estimate
 
@@ -339,26 +330,35 @@ class AIPlayer(Player):
 #############################
 ##   Unit test functions   ##
 #############################
-
 p = AIPlayer(1)
-
-
 ##
 # testUtility
 #
-# tests if the the utility function evaluates the board correctly
+# Description:
+#   tests if the the utility function evaluates the board correctly
+#
+# Parameters:
+#   None
+#
+# Return:
+#   None
 ##
-# def testUtility():
-#    gamestate = GameState.getBasicState()
-#    score = p.utility(gamestate)
-#    assert score <= 1.0
-#    assert score >= 0.0
-
-
+def testUtility():
+   gamestate = GameState.getBasicState()
+   score = p.utility(gamestate)
+   assert score > 0
+   assert score < 10000
 ##
 # testGetNode
 #
-# tests if the get node function returns the correct node
+# Description:
+#   tests if the get node function returns the correct node
+#
+# Parameters:
+#   None
+#
+# Return:
+#   None
 ##
 def testGetNode():
     move = Move(0)
@@ -367,18 +367,22 @@ def testGetNode():
     eval = p.utility(gamestate)
     parentNode = None
     node = p.getNode(move, gamestate, depth, parentNode)
-
     assert move == node["move"]
     assert gamestate == node["state"]
     assert depth == node["depth"]
     assert eval == node["evaluation"]
     assert parentNode == node["parentNode"]
-
-
 ##
 # testBestMove
 #
-# tests if the best move function returns the best move properly
+# Description:
+#   tests if the best move function returns the best move properly
+#
+# Parameters:
+#   None
+#
+# Return:
+#   None
 ##
 def testBestMove():
     move1 = Move(0)
@@ -386,21 +390,14 @@ def testBestMove():
     gamestate = GameState.getBasicState()
     depth = 2
     parent = None
-
     node1 = p.getNode(move1, gamestate, depth, parent)
     node1["evaluation"] = .9
-
     node2 = p.getNode(move2, gamestate, depth, parent)
     node2["evaluation"] = .6
-
     assert move1 == p.bestMove([node1, node2])
-
-
 ########################
 ## Calling unit tests ##
 ########################
-
-
-# testUtility()
+testUtility()
 testGetNode()
 testBestMove()
