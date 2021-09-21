@@ -103,12 +103,12 @@ class AIPlayer(Player):
         frontierNodes.append(rootNode)
 
         # Give it four iterations to get to the goal
-        for i in range(5):
+        for i in range(10):
             # Select node with the best score from frontierNodes
             bestNode = None
             lowestEval = 10000
             for node in frontierNodes:
-                if(node["evaluation"] < lowestEval):
+                if (node["evaluation"] < lowestEval):
                     bestNode = node
                     lowestEval = node["evaluation"]
 
@@ -129,12 +129,10 @@ class AIPlayer(Player):
                 lowestEval = potentialNode["evaluation"]
 
         # iterate back to the parent with depth of 1
-        while(bestNode["depth"] != 1):
+        while (bestNode["depth"] != 1):
             bestNode = bestNode["parentNode"]
 
         return bestNode["move"]
-
-
 
         #### OLD getMove IMPLEMENTATION
         # moves = []
@@ -165,8 +163,8 @@ class AIPlayer(Player):
 
     ##
     # utility
-    # Description: Examines the gamestate and returns a rating from 0 to 1
-    #   based on how good it thinks the state is. 0 is lowest, 1 is highest
+    # Description: Examines the gamestate and estimates how many turns will be
+    #   needed to finish the game
     #
     # Parameters:
     #   state - the state to be examined
@@ -178,102 +176,66 @@ class AIPlayer(Player):
         myInv = getCurrPlayerInventory(state)
         enemInv = getEnemyInv(self, state)
 
-        # anything below 0.5 is not ideal
-        rating = 0.0
+        estimate = 1000
 
-        # add .07 for each food in inventory
-        rating += 0.07 * myInv.foodCount
+        # just a queen is 1000 aka we dont want this. we lose with just queen
 
-        # add .075 for each worker we have, up to 2 (favor worker over just keeping a food)
-        if (len(getAntList(state, state.whoseTurn, (WORKER,))) <= 2):
-            rating += 0.075 * len(getAntList(state, state.whoseTurn, (WORKER,)))
+        # 1 workers is 2 * 11-food * 2
+        # 2 workers divides that by 2
+        workers = getAntList(state, 1, [WORKER, ])
+        numWorkers = len(workers)
 
-        # add .2 if we have a drone
-        if (len(getAntList(state, state.whoseTurn, (DRONE,))) == 1):
-            rating += 0.2
+        tunnelCoords = getConstrList(state, state.whoseTurn, [TUNNEL, ])[0].coords
 
-        # add .25 if we have a soldier
-        if (len(getAntList(state, state.whoseTurn, (SOLDIER,))) == 1):
-            rating += 0.25
+        foods = getConstrList(state, 2, [FOOD, ])
+        if len(foods) > 1:
 
-        # Evaluate how close this state is to adding a piece of food
-        for ant in myInv.ants:
+            closerDropOffCoords = myInv.getAnthill().coords
+            myFood = foods[0]
+            max = 1000
+            for food in foods:
+                steps = approxDist(food.coords, myInv.getAnthill().coords)
+                if steps < max:
+                    max = steps
+                    myFood = food
+                    closerDropOffCoords = myInv.getAnthill().coords
+                steps = approxDist(food.coords, tunnelCoords)
+                if steps < max:
+                    max = steps
+                    myFood = food
+                    closerDropOffCoords = tunnelCoords
 
-            # Queen behavior (keep off anthill)
-            if (ant.type == QUEEN):
-                if (myInv.getAnthill().coords == ant.coords):
-                    return 0.0
+            dist = approxDist(closerDropOffCoords, myFood.coords)
 
-            # Worker behavior
-            if (ant.type == WORKER):
-                stepsTilFood = 0
-                stepsTilConstr = 0
+            if numWorkers == 0:
+                estimate = 1000
+            elif numWorkers == 1:
+                estimate = (11 - myInv.foodCount) * dist * 2
 
-                # calculate the closest food source on my side
-                if not (ant.carrying):
-                    stepsTilFood = 100  # ie infinity
-                    stepsTilConstr = 100  # ie infinity
-                    foods = getCurrPlayerFood(self, state)
-                    for food in foods:
-                        potentialSteps = approxDist(ant.coords, food.coords)
-                        if (potentialSteps < stepsTilFood):
-                            stepsTilFood = potentialSteps
-                            foodSource = food
+            for worker in workers:
+                if worker.carrying:
+                    estimate -= dist
 
-                    # calculate the closest structure from foodSource coords
-                    constrs = []
-                    constrs.append(myInv.getAnthill())
-                    constrs.append(myInv.getTunnels()[0])
-                    for constr in constrs:
-                        potentialSteps = approxDist(foodSource.coords, constr.coords)
-                        if (potentialSteps < stepsTilConstr):
-                            stepsTilConstr = potentialSteps
+            for worker in workers:
+                x = worker.coords[0]
+                y = worker.coords[1]
+                if getAntAt(state, (x - 1, y)) is DRONE:
+                    estimate += 3
+                if not getAntAt(state, (x, y - 1)) is DRONE:
+                    estimate += 3
+                if not getAntAt(state, (x + 1, y)) is DRONE:
+                    estimate += 3
+                if not getAntAt(state, (x, y + 1)) is DRONE:
+                    estimate += 3
 
+            # moving queen off hill and tunnel and food reduces time by 2
+            queenCoords = myInv.getQueen().coords
+            if queenCoords == myInv.getAnthill().coords \
+                    or queenCoords == tunnelCoords \
+                    or queenCoords == myFood.coords:
+                estimate += 2
 
-                else:
-                    stepsTilFood = 0
-                    stepsTilConstr = 100  # ie infinity
-                    # calculate the closest structure from ant coords
-                    constrs = []
-                    constrs.append(myInv.getTunnels()[0])
-                    constrs.append(myInv.getAnthill())
-                    for constr in constrs:
-                        potentialSteps = approxDist(ant.coords, constr.coords)
-                        if (potentialSteps < stepsTilConstr):
-                            stepsTilConstr = potentialSteps
-
-                stepsToAddFood = stepsTilFood + stepsTilConstr
-
-                rating -= 0.005 * stepsToAddFood
-
-            # Drone behavior
-
-            if (ant.type == DRONE):
-                shortestPathToEnemWorker = 0
-                if not (len(getAntList(state, 1 - state.whoseTurn, (WORKER,))) == 0):
-                    shortestPathToEnemWorker = 100  # ie infinity
-                    for enemAnt in enemInv.ants:
-                        if (enemAnt.type == WORKER):
-                            potentialSteps = approxDist(ant.coords, enemAnt.coords)
-                            if (potentialSteps < shortestPathToEnemWorker):
-                                shortestPathToEnemWorker = potentialSteps
-
-                rating -= 0.005 * shortestPathToEnemWorker
-
-            # Soldier behavior
-
-            if (ant.type == SOLDIER):
-                shortestPathToEnemQueen = 100  # ie infinity
-                for enemAnt in enemInv.ants:
-                    if (enemAnt.type == QUEEN):
-                        potentialSteps = approxDist(ant.coords, enemAnt.coords)
-                        if (potentialSteps < shortestPathToEnemQueen):
-                            shortestPathToEnemQueen = potentialSteps
-
-                rating -= 0.005 * shortestPathToEnemQueen
-
-        # max rating possible is 1.34, so divide rating by that to get a score between 0 and 1.
-        return 1 / ((rating + .0001) / 1.34)
+        return estimate
 
     ##
     # expandNode
@@ -288,7 +250,7 @@ class AIPlayer(Player):
         ret = []
         for move in moves:
             ret.append(self.getNode(move, getNextState(parentNode["state"], move),
-                         parentNode["depth"] + 1, parentNode))
+                                    parentNode["depth"] + 1, parentNode))
         return ret
 
     ##
@@ -373,11 +335,11 @@ p = AIPlayer(1)
 #
 # tests if the the utility function evaluates the board correctly
 ##
-def testUtility():
-    gamestate = GameState.getBasicState()
-    score = p.utility(gamestate)
-    assert score <= 1.0
-    assert score >= 0.0
+# def testUtility():
+#    gamestate = GameState.getBasicState()
+#    score = p.utility(gamestate)
+#    assert score <= 1.0
+#    assert score >= 0.0
 
 
 ##
@@ -426,6 +388,6 @@ def testBestMove():
 ########################
 
 
-testUtility()
+# testUtility()
 testGetNode()
 testBestMove()
