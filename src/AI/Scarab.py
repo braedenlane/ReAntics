@@ -108,6 +108,7 @@ class AIPlayer(Player):
                 frontierNodes.remove(node)
                 expandedNodes.append(node)
                 children = self.expandNode(node)
+                node["children"] = children
 
             frontierNodes.extend(children)
 
@@ -241,7 +242,9 @@ class AIPlayer(Player):
             "state": state,
             "depth": depth,
             "evaluation": eval,
-            "parentNode": parentNode
+            "parentNode": parentNode,
+            "children": None,
+            "minimax": None
         }
         return node
 
