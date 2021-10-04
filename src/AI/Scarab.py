@@ -102,24 +102,14 @@ class AIPlayer(Player):
 
         frontierNodes.append(rootNode)
 
-        # Give it hundred iterations to get to the goal
-        for i in range(50):
-            # Select node with the best score from frontierNodes
-            bestNode = None
-            lowestEval = 10000
+        # Expand nodes until depth of 4 is reached
+        for i in range(4):
             for node in frontierNodes:
-                if (node["evaluation"] < lowestEval):
-                    bestNode = node
-                    lowestEval = node["evaluation"]
+                frontierNodes.remove(node)
+                expandedNodes.append(node)
+                children = self.expandNode(node)
 
-            # Expand bestNode selected
-            frontierNodes.remove(bestNode)
-            expandedNodes.append(bestNode)
-            children = self.expandNode(bestNode)
-
-            # add children to frontierNodes list
             frontierNodes.extend(children)
-            # frontierNodes.sort(key=self.getEval)
 
         # Choose the move with the lowest score in frontierNodes and trace back to parent
         bestNode = None
@@ -134,33 +124,6 @@ class AIPlayer(Player):
             bestNode = bestNode["parentNode"]
 
         return bestNode["move"]
-
-        #### OLD getMove IMPLEMENTATION
-        # moves = []
-        # moves.extend(listAllMovementMoves(currentState))
-        # if (len(moves) == 0):
-        #     moves.append(Move(END, None, None))
-        # moves.extend(listAllBuildMoves(currentState))
-        # states = []
-        # nodes = []
-        # count = 0
-        #
-        # # rootNode is the node relating to the current state. Has no parent or previous move
-        # rootNode = self.getNode(None, currentState, 0, None)
-        #
-        # # get a list of valid states based on legal moves
-        # for move in moves:
-        #     states.append(getNextState(currentState, move))
-        #
-        # # develop a node list based on the moves and states lists
-        # for move in moves:
-        #     toAdd = self.getNode(moves[count], states[count], 1, rootNode)
-        #     nodes.append(toAdd)
-        #     count += 1
-        #
-        # selectedMove = self.bestMove(nodes)
-        #
-        # return selectedMove
 
     def getEval(self, dict):
         return dict["evaluation"]
