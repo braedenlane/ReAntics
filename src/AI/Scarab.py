@@ -103,7 +103,7 @@ class AIPlayer(Player):
         frontierNodes.append(rootNode)
 
         # Expand nodes until depth of 4 is reached
-        for i in range(4):
+        for i in range(6):
             for node in frontierNodes:
                 frontierNodes.remove(node)
                 expandedNodes.append(node)
@@ -112,19 +112,15 @@ class AIPlayer(Player):
 
             frontierNodes.extend(children)
 
-        # Choose the move with the lowest score in frontierNodes and trace back to parent
-        bestNode = None
-        lowestEval = 10000
-        for potentialNode in frontierNodes:
-            if (potentialNode["evaluation"] < lowestEval):
-                bestNode = potentialNode
-                lowestEval = potentialNode["evaluation"]
+        self.getMinimax(rootNode, currentState.whoseTurn)
 
-        # iterate back to the parent with depth of 1
-        while (bestNode["depth"] != 1):
-            bestNode = bestNode["parentNode"]
+        # Choose the move with the corresponding best minimax value as rootNode
+        for child in rootNode["children"]:
+            if(child["minimax"] == rootNode["minimax"]):
+                return child["move"]
 
-        return bestNode["move"]
+        # Default to just ending the turn
+        return Move(END, None, None)
 
     def getEval(self, dict):
         return dict["evaluation"]
@@ -183,6 +179,8 @@ class AIPlayer(Player):
                 estimate = 1000
             elif numWorkers == 1:
                 estimate = (11 - myInv.foodCount) * dist * 2
+            else:
+                estimate = 10000
 
             for worker in workers:
                 if not worker.carrying:
@@ -206,6 +204,38 @@ class AIPlayer(Player):
         return estimate
 
     ##
+    # getMinimax
+    # Description:
+    # Recursive method that finds the minimax value of a node and it's children
+    # down to the leaves
+    #
+    # Parameters:
+    #   parentNode - the node that we are assigning a minimax value to
+    #   agentPlayerID - ID of our agent, since it is passed down from rootnode, will
+    #                   always correspond to our agent
+    ##
+    def getMinimax(self, parentNode, agentPlayerID):
+        # Base case: if children is null, assign the minimax value equal to util
+        if(parentNode["children"] == None):
+            parentNode["minimax"] = parentNode["evaluation"]
+        # Recursive case: Navigate down to leaves to assign the minimax value
+        else:
+            for child in parentNode["children"]:
+                self.getMinimax(child, agentPlayerID)
+            # When it's our turn, look for the lowest number of turns to reach goal
+            if(parentNode["state"].whoseTurn == agentPlayerID):
+                parentNode["minimax"] = 1000000  # arbitrary large number
+                for child in parentNode["children"]:
+                    if(child["minimax"] < parentNode["minimax"]):
+                        parentNode["minimax"] = child["minimax"]
+            # When it's our opponents turn, they'd look for the highest number
+            else:
+                parentNode["minimax"] = -1  # arbitrary small number
+                for child in parentNode["children"]:
+                    if (child["minimax"] > parentNode["minimax"]):
+                        parentNode["minimax"] = child["minimax"]
+
+    ##
     # expandNode
     # Description:
     # Creates new nodes based on a node that is passed in as a parameter
@@ -217,7 +247,7 @@ class AIPlayer(Player):
         moves = listAllLegalMoves(parentNode["state"])
         ret = []
         for move in moves:
-            ret.append(self.getNode(move, getNextState(parentNode["state"], move),
+            ret.append(self.getNode(move, getNextStateAdversarial(parentNode["state"], move),
                                     parentNode["depth"] + 1, parentNode))
         return ret
 
