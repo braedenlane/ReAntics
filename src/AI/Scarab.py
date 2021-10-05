@@ -179,8 +179,8 @@ class AIPlayer(Player):
                 estimate = 1000
             elif numWorkers == 1:
                 estimate = (11 - myInv.foodCount) * dist * 2
-            else:
-                estimate = 10000
+            elif numWorkers > 1:
+                estimate += 1000
 
             for worker in workers:
                 if not worker.carrying:
@@ -194,11 +194,11 @@ class AIPlayer(Player):
                 estimate += 2
 
             if (len(drones) == 1):
-                estimate -= 30
+                estimate -= 100
                 if (len(enemWorkers) >= 1):
-                    estimate += approxDist(drones[0].coords, enemWorkers[0].coords)
+                    estimate += approxDist(drones[0].coords, enemWorkers[0].coords)*2
                 elif(len(enemWorkers) == 0):
-                    estimate -= 10
+                    estimate -= 30
                     estimate += approxDist(drones[0].coords, enemInv.getAnthill().coords)
 
         return estimate
@@ -217,6 +217,9 @@ class AIPlayer(Player):
     def getMinimax(self, parentNode, agentPlayerID):
         # Base case: if children is null, assign the minimax value equal to util
         if(parentNode["children"] == None):
+            parentNode["minimax"] = parentNode["evaluation"]
+        # Base case: parentNode only has one move: endTurn
+        elif(len(parentNode["children"]) == 1):
             parentNode["minimax"] = parentNode["evaluation"]
         # Recursive case: Navigate down to leaves to assign the minimax value
         else:
@@ -247,7 +250,7 @@ class AIPlayer(Player):
         moves = listAllLegalMoves(parentNode["state"])
         ret = []
         for move in moves:
-            ret.append(self.getNode(move, getNextStateAdversarial(parentNode["state"], move),
+            ret.append(self.getNode(move, getNextState(parentNode["state"], move),
                                     parentNode["depth"] + 1, parentNode))
         return ret
 
