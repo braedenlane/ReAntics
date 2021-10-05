@@ -112,7 +112,7 @@ class AIPlayer(Player):
 
             frontierNodes.extend(children)
 
-        self.getMinimax(rootNode, currentState.whoseTurn)
+        self.getMinimax(rootNode, -10000000, 10000000, currentState.whoseTurn)
 
         # Choose the move with the corresponding best minimax value as rootNode
         for child in rootNode["children"]:
@@ -193,7 +193,17 @@ class AIPlayer(Player):
                     or queenCoords == myFood.coords:
                 estimate += 2
 
-            if (len(drones) == 1):
+            if(len(enemWorkers) == 0):
+                if(len(drones) == 0):
+                    estimate -= 300
+                elif (len(drones) == 1):
+                    estimate -= 100
+                    if (len(enemWorkers) >= 1):
+                        estimate += approxDist(drones[0].coords, enemWorkers[0].coords)*2
+                    elif(len(enemWorkers) == 0):
+                        estimate -= 30
+                        estimate += approxDist(drones[0].coords, enemInv.getAnthill().coords)
+            elif (len(drones) == 1):
                 estimate -= 100
                 if (len(enemWorkers) >= 1):
                     estimate += approxDist(drones[0].coords, enemWorkers[0].coords)*2
@@ -214,29 +224,37 @@ class AIPlayer(Player):
     #   agentPlayerID - ID of our agent, since it is passed down from rootnode, will
     #                   always correspond to our agent
     ##
-    def getMinimax(self, parentNode, agentPlayerID):
+    def getMinimax(self, parentNode, alpha, beta, agentPlayerID):
         # Base case: if children is null, assign the minimax value equal to util
         if(parentNode["children"] == None):
             parentNode["minimax"] = parentNode["evaluation"]
+            return parentNode["minimax"]
         # Base case: parentNode only has one move: endTurn
         elif(len(parentNode["children"]) == 1):
             parentNode["minimax"] = parentNode["evaluation"]
+            return parentNode["minimax"]
         # Recursive case: Navigate down to leaves to assign the minimax value
         else:
-            for child in parentNode["children"]:
-                self.getMinimax(child, agentPlayerID)
-            # When it's our turn, look for the lowest number of turns to reach goal
             if(parentNode["state"].whoseTurn == agentPlayerID):
-                parentNode["minimax"] = 1000000  # arbitrary large number
+                lowestMin = 10000000
                 for child in parentNode["children"]:
-                    if(child["minimax"] < parentNode["minimax"]):
-                        parentNode["minimax"] = child["minimax"]
-            # When it's our opponents turn, they'd look for the highest number
+                    potentialMin = self.getMinimax(child, alpha, beta, agentPlayerID)
+                    lowestMin = min(lowestMin, potentialMin)
+                    beta = min(beta, potentialMin)
+                    if(beta <= alpha):
+                        break
+                parentNode["minimax"] = lowestMin
+                return lowestMin
             else:
-                parentNode["minimax"] = -1  # arbitrary small number
+                largestMax = -10000000
                 for child in parentNode["children"]:
-                    if (child["minimax"] > parentNode["minimax"]):
-                        parentNode["minimax"] = child["minimax"]
+                    potentialMax = self.getMinimax(child, alpha, beta, agentPlayerID)
+                    largestMax = max(largestMax, potentialMax)
+                    alpha = max(alpha, potentialMax)
+                    if(beta <= alpha):
+                        break
+                parentNode["minimax"] = largestMax
+                return largestMax
 
     ##
     # expandNode
