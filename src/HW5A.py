@@ -59,7 +59,7 @@ def get_input_sum(input_array):
         (hidden_weights[counter+1] * input_array[0]) + \
         (hidden_weights[counter+2] * input_array[1]) + \
         (hidden_weights[counter+3] * input_array[2]) + \
-        (hidden_weights[counter+1] * input_array[3]))
+        (hidden_weights[counter+4] * input_array[3]))
         before_sigmoid.append(sum)
         counter = counter + 5
 
@@ -142,6 +142,13 @@ inps2 = [1,1,1,1]
 
 # trying out some stuff to test backprop
 error = 1
-while (abs(error) > 0.05):
-    error = backprop(0)
-    print(error)
+inputs = np.array([-1, -1, -1, -1, -1,
+                  -1, -1, -1, -1, -1])
+for i in range(len(inputs)):
+    inputs[i] = random.randint(0,15)
+    print(inputs[i])
+while (abs(error/10) > 0.05):
+    error = 0
+    for i in range(len(inputs)):
+        error = abs(error) + abs(backprop(inputs[i]))
+    print(error/10)
