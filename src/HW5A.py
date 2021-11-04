@@ -9,15 +9,14 @@ import math
 hidden_weights = []
 for i in range(40):
     hidden_weights.append(round(random.uniform(-1.0, 1.0), 1))
-# print(len(hidden_weights))
 
 # 9 weights in the outer layer; 1 for bias, eight for the outpuer of the eight hidden nodes
 # outer_weights[0] = bias, the rest are for the nodes
 outer_weights = []
 for i in range(9):
     outer_weights.append(round(random.uniform(-1.0, 1.0), 1))
-# print(len(outer_weights))
 
+# all possible inputs as outlined by HW5A assignment
 all_inputs = np.array([[0,0,0,0],
                        [0,0,0,1],
                        [0,0,1,0],
@@ -34,12 +33,10 @@ all_inputs = np.array([[0,0,0,0],
                        [1,1,0,1],
                        [1,1,1,0],
                        [1,1,1,1]])
-# print(all_inputs)
-# print(all_inputs[1])
-                
+
+# Expected outputs as outlined in HW5A assignment
+#   Note: index of each output corresponds to the proper input of all_inputs
 expected_outputs = np.array([[0,1,0,1,0,1,0,1,1,1,1,1,0,0,0,1]]).T
-# print(expected_outputs)
-# print(expected_outputs[1])
 
 # sigmoid function
 def sigmoid(x):
@@ -65,6 +62,8 @@ def get_input_sum(input_array):
 
     return before_sigmoid
 
+# Utilizes get_input_sum helper to apply the sum of inputs*weight
+# to then apply them to the sigmoid function
 def get_hidden_outputs(input_array):
     before_sigmoid = get_input_sum(input_array)
     for_output_layer = []
@@ -73,6 +72,9 @@ def get_hidden_outputs(input_array):
 
     return for_output_layer
 
+# Utilizes get_hidden_outputs to properly calculate the inputs for the output method node.
+#   Note: Bias is assigned to the outer_sum variable and then other inputs and weights are
+#         calculated before feeding into the sigmoid function
 def output_method(input_array):
     for_output_layer = get_hidden_outputs(input_array)
     outer_sum = outer_weights[0]
@@ -81,7 +83,8 @@ def output_method(input_array):
 
     return sigmoid(outer_sum)
 
-# val = random from all_inputs corresponding with expected_outputs?
+# val = random int to select array of values from all_inputs,
+# as well as corresponding expected_outputs
 def backprop(val):
     alpha = 0.75
     # Step 2 in slides
@@ -106,7 +109,8 @@ def backprop(val):
         if(i == 0):
             outer_weights[i] = outer_weights[i] + (alpha * delta_output_node)
         else:
-            outer_weights[i] = outer_weights[i] + (alpha * delta_output_node * hidden_outputs[i-1])
+            outer_weights[i] = outer_weights[i] + \
+                               (alpha * delta_output_node * hidden_outputs[i-1])
     
     for i in range(len(hidden_weights)):
         j = 0
@@ -129,28 +133,25 @@ def backprop(val):
         if((i%5) == 0):
             hidden_weights[i] = hidden_weights[i] + (alpha * hidden_deltas[j])
         else:
-            hidden_weights[i] = hidden_weights[i] + (alpha * hidden_deltas[j] * all_inputs[val][(i%5)-1])
+            hidden_weights[i] = hidden_weights[i] + \
+                                (alpha * hidden_deltas[j] * all_inputs[val][(i%5)-1])
 
     return error_output_node
         
 
-# testing output_method but not for accuracy
-inps = [0,0,0,0]
-inps2 = [1,1,1,1]
-# print(output_method(inps))
-# print(output_method(inps2))
-
-# trying out some stuff to test backprop
+# Define variables to be used later
 error = 1
-inputs = np.array([-1, -1, -1, -1, -1,
+inputs_chosen = np.array([-1, -1, -1, -1, -1,
                   -1, -1, -1, -1, -1])
+# Determine the inputs to be selected from all_inputs
 print("Inputs:")
-for i in range(len(inputs)):
-    inputs[i] = random.randint(0,15)
-    print(inputs[i])
+for i in range(len(inputs_chosen)):
+    inputs_chosen[i] = random.randint(0,15)
+    print(all_inputs[inputs_chosen[i]])
+
 print("Error Values after each epoch:")
 while (abs(error/10) > 0.05):
     error = 0
-    for i in range(len(inputs)):
-        error = abs(error) + abs(backprop(inputs[i]))
+    for i in range(len(inputs_chosen)):
+        error = abs(error) + abs(backprop(inputs_chosen[i]))
     print(error/10)
