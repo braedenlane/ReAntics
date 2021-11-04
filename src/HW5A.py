@@ -9,14 +9,14 @@ import math
 hidden_weights = []
 for i in range(40):
     hidden_weights.append(round(random.uniform(-1.0, 1.0), 1))
-print(len(hidden_weights))
+# print(len(hidden_weights))
 
 # 9 weights in the outer layer; 1 for bias, eight for the outpuer of the eight hidden nodes
 # outer_weights[0] = bias, the rest are for the nodes
 outer_weights = []
 for i in range(9):
     outer_weights.append(round(random.uniform(-1.0, 1.0), 1))
-print(len(outer_weights))
+# print(len(outer_weights))
 
 all_inputs = np.array([[0,0,0,0],
                        [0,0,0,1],
@@ -144,9 +144,11 @@ inps2 = [1,1,1,1]
 error = 1
 inputs = np.array([-1, -1, -1, -1, -1,
                   -1, -1, -1, -1, -1])
+print("Inputs:")
 for i in range(len(inputs)):
     inputs[i] = random.randint(0,15)
     print(inputs[i])
+print("Error Values after each epoch:")
 while (abs(error/10) > 0.05):
     error = 0
     for i in range(len(inputs)):
