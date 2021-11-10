@@ -1,4 +1,6 @@
+import numpy as np
 import random
+import math
 import sys
 
 from Player import *
@@ -18,6 +20,24 @@ sys.path.append("..")  # so other modules can be found in parent dir
 #   playerId - The id of the player.
 ##
 class AIPlayer(Player):
+
+    ###########################################
+    ############## and Variables ##############
+    ###########################################
+
+    # 40 weights of the hidden layer
+    # bias0, weightA0, weightB0, weightC0, weightD0, ..., bias1, weightA1, weightB1, weightC1, ...,
+    # bias7, weightA7, weightB7, weightC7, weightD7, ... (where ABCDEFGH are inputs)
+    # assigned random value from -1.0 to 1.0 rounded to 1 decimal place
+    hidden_weights = []
+    for i in range(72):
+        hidden_weights.append(round(random.uniform(-1.0, 1.0), 1))
+
+    # 9 weights in the outer layer; 1 for bias, eight for the outpuer of the eight hidden nodes
+    # outer_weights[0] = bias, the rest are for the nodes
+    outer_weights = []
+    for i in range(9):
+        outer_weights.append(round(random.uniform(-1.0, 1.0), 1))
 
     # __init__
     # Description: Creates a new Player
@@ -123,6 +143,152 @@ class AIPlayer(Player):
 
     ##
     # utility
+    # Description: Uses ANN to examine the utility of a state
+    #   and returns a rating from 0 to 1 based on how good it
+    #   thinks the state is. 0 is the lowest, 1 is the highest
+    #
+    # Parameters:
+    #   state - the state to be examined
+    #
+    # Return: the score of the gamestate (0.0 is lowest, 1.0 is highest)
+    ##
+    def utility(self, state):
+        inputs = self.getInputs(state)
+        return self.output_method(inputs)
+
+    ##
+    # getInputs
+    # Description: based off of oldUtility, gets inputs based on the
+    # state of the game for the ANN to use in it's function
+    ##
+    def getInputs(self, state):
+        # Initialize Inputs
+        foodInput = 0.0
+        workerInput = 0.0
+        haveDroneInput = 0.0
+        haveSoldierInput = 0.0
+        queenAnthillinput = 0.0
+        addFoodInput = 0.0
+        droneDistanceInput = 0.0
+        soldierDistanceInput = 0.0
+
+        myInv = getCurrPlayerInventory(state)
+        enemInv = getEnemyInv(self, state)
+
+        # inputs for the ANN based off of a state
+        #   Note: All inputs are between 0.0 and 1.0
+
+        # more food, bigger input
+        foodInput = (1.0 / 11.0) * myInv.foodCount
+
+        # If we have one or two workers, give it some input
+        if (len(getAntList(state, state.whoseTurn, (WORKER,))) <= 2):
+            workerInput = 0.5 * len(getAntList(state, state.whoseTurn, (WORKER,)))
+        else:
+            workerInput = 0.0
+
+        # If we have a drone, feed input
+        if (len(getAntList(state, state.whoseTurn, (DRONE,))) == 1):
+            haveDroneInput = 1.0
+        else:
+            haveDroneInput = 0.0
+
+        # 1.0 if we have soldier, 0.0 if not
+        if (len(getAntList(state, state.whoseTurn, (SOLDIER,))) == 1):
+            haveSoldierInput = 1.0
+        else:
+            haveSoldierInput = 0.0
+
+        for ant in myInv.ants:
+
+            # Queen behavior (keep off anthill)
+            if (ant.type == QUEEN):
+                if (myInv.getAnthill().coords == ant.coords):
+                    queenAnthillInput = 0.0
+                else:
+                    queenAnthillInput = 1.0
+
+            # Worker behavior
+            if (ant.type == WORKER):
+                stepsTilFood = 0
+                stepsTilConstr = 0
+
+                # calculate the closest food source on my side
+                if not (ant.carrying):
+                    stepsTilFood = 100  # ie infinity
+                    stepsTilConstr = 100  # ie infinity
+                    foods = getCurrPlayerFood(self, state)
+                    for food in foods:
+                        potentialSteps = stepsToReach(state, ant.coords, food.coords)
+                        if (potentialSteps < stepsTilFood):
+                            stepsTilFood = potentialSteps
+                            foodSource = food
+
+                    # calculate the closest structure from foodSource coords
+                    constrs = []
+                    constrs.append(myInv.getAnthill())
+                    constrs.append(myInv.getTunnels()[0])
+                    for constr in constrs:
+                        potentialSteps = stepsToReach(state, foodSource.coords, constr.coords)
+                        if (potentialSteps < stepsTilConstr):
+                            stepsTilConstr = potentialSteps
+
+
+                else:
+                    stepsTilFood = 0
+                    stepsTilConstr = 100  # ie infinity
+                    # calculate the closest structure from ant coords
+                    constrs = []
+                    constrs.append(myInv.getTunnels()[0])
+                    constrs.append(myInv.getAnthill())
+                    for constr in constrs:
+                        potentialSteps = stepsToReach(state, ant.coords, constr.coords)
+                        if (potentialSteps < stepsTilConstr):
+                            stepsTilConstr = potentialSteps
+
+                stepsToAddFood = stepsTilFood + stepsTilConstr
+                if(stepsToAddFood != 0):
+                    addFoodInput = .99 / stepsToAddFood
+                else:
+                    addFoodInput = 1.0
+
+            # Drone behavior
+            if (ant.type == DRONE):
+                shortestPathToEnemWorker = 0
+                if not (len(getAntList(state, 1 - state.whoseTurn, (WORKER,))) == 0):
+                    shortestPathToEnemWorker = 100  # ie infinity
+                    for enemAnt in enemInv.ants:
+                        if (enemAnt.type == WORKER):
+                            potentialSteps = stepsToReach(state, ant.coords, enemAnt.coords)
+                            if (potentialSteps < shortestPathToEnemWorker):
+                                shortestPathToEnemWorker = potentialSteps
+
+                if(shortestPathToEnemWorker != 0):
+                    droneDistanceInput = .99 / shortestPathToEnemWorker
+                else:
+                    droneDistanceInput = 1.0
+
+            # Soldier behavior
+            if (ant.type == SOLDIER):
+                shortestPathToEnemQueen = 100  # ie infinity
+                for enemAnt in enemInv.ants:
+                    if (enemAnt.type == QUEEN):
+                        potentialSteps = stepsToReach(state, ant.coords, enemAnt.coords)
+                        if (potentialSteps < shortestPathToEnemQueen):
+                            shortestPathToEnemQueen = potentialSteps
+
+                if(shortestPathToEnemQueen != 0):
+                    soldierDistanceInput = .99 / shortestPathToEnemQueen
+                else:
+                    soldierDistanceInput = 1.0
+
+        inputs = np.array([foodInput, workerInput, haveDroneInput,
+                           haveSoldierInput, queenAnthillinput, addFoodInput,
+                           droneDistanceInput, soldierDistanceInput])
+        return inputs
+
+    ##
+    # oldUtility
     # Description: Examines the gamestate and returns a rating from 0 to 1
     #   based on how good it thinks the state is. 0 is lowest, 1 is highest
     #
@@ -131,7 +297,7 @@ class AIPlayer(Player):
     #
     # Return: the score the the gamestate (0.0 is lowest, 1.0 is highest)
     ##
-    def utility(self, state):
+    def oldUtility(self, state):
 
         myInv = getCurrPlayerInventory(state)
         enemInv = getEnemyInv(self, state)
@@ -247,7 +413,10 @@ class AIPlayer(Player):
     # Return:
     ##
     def getNode(self, move, state, depth, parentNode):
-        eval = self.utility(state)
+        eval = self.oldUtility(state)
+        aNNeval = self.utility(state)
+        inputs = self.getInputs(state)
+        print(self.backprop(aNNeval, eval, inputs))
         node = {
             "move": move,
             "state": state,
@@ -301,72 +470,114 @@ class AIPlayer(Player):
         # method templaste, not implemented
         pass
 
+    ###########################################
+    ############## ANN Functions ##############
+    ###########################################
 
-#############################
-##   Unit test functions   ##
-#############################
-
-p = AIPlayer(1)
-
-
-##
-# testUtility
-#
-# tests if the the utility function evaluates the board correctly
-##
-def testUtility():
-    gamestate = GameState.getBasicState()
-    score = p.utility(gamestate)
-    assert score <= 1.0
-    assert score >= 0.0
+    # sigmoid function
+    def sigmoid(self, x):
+        return 1 / (1 + np.exp(-x))
 
 
-##
-# testGetNode
-#
-# tests if the get node function returns the correct node
-##
-def testGetNode():
-    move = Move(0)
-    gamestate = GameState.getBasicState()
-    depth = 2
-    eval = p.utility(gamestate)
-    parentNode = None
-    node = p.getNode(move, gamestate, depth, parentNode)
+    # goes through the hidden weights multiplying the input by the weights
+    # uses counter as an incrementer to go through every (where ABCDEFGH are inputs)
+    # 9 weights (bias, weightA, weightB, weightC, weightD, ...) then sigmoid and
+    # repeats 8 times 8*9 = 72
+    # then uses these values to multiply with the outer_weights and then sigmoid
+    # the sum to get the output of the network
+    def get_input_sum(self, input_array):
+        counter = 0
+        before_sigmoid = []
+        for i in range(8):
+            sum = (self.hidden_weights[counter] + \
+                   (self.hidden_weights[counter + 1] * input_array[0]) + \
+                   (self.hidden_weights[counter + 2] * input_array[1]) + \
+                   (self.hidden_weights[counter + 3] * input_array[2]) + \
+                   (self.hidden_weights[counter + 4] * input_array[2]) + \
+                   (self.hidden_weights[counter + 5] * input_array[2]) + \
+                   (self.hidden_weights[counter + 6] * input_array[2]) + \
+                   (self.hidden_weights[counter + 7] * input_array[2]) + \
+                   (self.hidden_weights[counter + 8] * input_array[3]))
+            before_sigmoid.append(sum)
+            counter = counter + 5
 
-    assert move == node["move"]
-    assert gamestate == node["state"]
-    assert depth == node["depth"]
-    assert eval == node["evaluation"]
-    assert parentNode == node["parentNode"]
-
-
-##
-# testBestMove
-#
-# tests if the best move function returns the best move properly
-##
-def testBestMove():
-    move1 = Move(0)
-    move2 = Move(1)
-    gamestate = GameState.getBasicState()
-    depth = 2
-    parent = None
-
-    node1 = p.getNode(move1, gamestate, depth, parent)
-    node1["evaluation"] = .9
-
-    node2 = p.getNode(move2, gamestate, depth, parent)
-    node2["evaluation"] = .6
-
-    assert move1 == p.bestMove([node1, node2])
+        return before_sigmoid
 
 
-########################
-## Calling unit tests ##
-########################
+    # Utilizes get_input_sum helper to apply the sum of inputs*weight
+    # to then apply them to the sigmoid function
+    def get_hidden_outputs(self, input_array):
+        before_sigmoid = self.get_input_sum(input_array)
+        for_output_layer = []
+        for i in range(len(before_sigmoid)):
+            for_output_layer.append(self.sigmoid(before_sigmoid[i]))
+
+        return for_output_layer
 
 
-testUtility()
-testGetNode()
-testBestMove()
+    # Utilizes get_hidden_outputs to properly calculate the inputs for the output method node.
+    #   Note: Bias is assigned to the outer_sum variable and then other inputs and weights are
+    #         calculated before feeding into the sigmoid function
+    def output_method(self, input_array):
+        for_output_layer = self.get_hidden_outputs(input_array)
+        outer_sum = self.outer_weights[0]
+        for i in range(len(for_output_layer)):
+            outer_sum = outer_sum + (for_output_layer[i] * self.outer_weights[i + 1])
+
+        return self.sigmoid(outer_sum)
+
+
+    # val = random int to select array of values from all_inputs,
+    # as well as corresponding expected_outputs
+    def backprop(self, outputOfUtil, targetOutput, input_array):
+        alpha = 0.75
+        # Step 2 in slides
+        a = outputOfUtil
+        # Step 3 in slides
+        error_output_node = targetOutput - a
+        # Step 4 in slides
+        delta_output_node = error_output_node * a * (1 - a)
+        # Step 5 in slides
+        hidden_errors = []
+        for i in range(1, len(self.outer_weights)):
+            hidden_errors.append(self.outer_weights[i] * delta_output_node)
+        # Step 6 in slides
+        hidden_deltas = []
+        hidden_outputs = self.get_hidden_outputs(input_array)
+        for i in range(len(hidden_errors)):
+            hidden_deltas.append(hidden_errors[i] * hidden_outputs[i] * (1 - hidden_outputs[i]))
+        # Step 7 in slides
+        # change the outer layer weights
+        # change bias differently with x as 1 rather than x as hidden_outputs[i-1]
+        for i in range(len(self.outer_weights)):
+            if (i == 0):
+                self.outer_weights[i] = self.outer_weights[i] + (alpha * delta_output_node)
+            else:
+                self.outer_weights[i] = self.outer_weights[i] + \
+                                   (alpha * delta_output_node * hidden_outputs[i - 1])
+
+        for i in range(len(self.hidden_weights)):
+            j = 0
+            if (i < 9):
+                j = 0
+            elif (i < 18):
+                j = 1
+            elif (i < 27):
+                j = 2
+            elif (i < 36):
+                j = 3
+            elif (i < 45):
+                j = 4
+            elif (i < 54):
+                j = 5
+            elif (i < 63):
+                j = 6
+            else:
+                j = 7
+            if ((i % 9) == 0):
+                self.hidden_weights[i] = self.hidden_weights[i] + (alpha * hidden_deltas[j])
+            else:
+                self.hidden_weights[i] = self.hidden_weights[i] + \
+                                    (alpha * hidden_deltas[j] * input_array[(i % 9) - 1])
+
+        return error_output_node
