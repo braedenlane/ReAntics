@@ -302,9 +302,7 @@ class AIPlayer(Player):
     def saveWeights(self):
         path = Path('.\laneb22_profenna23_weights.txt')
         if (path.is_file()):
-            print("removing")
             os.remove(path)
-        print("Open file\n")
         f = open(".\laneb22_profenna23_weights.txt", "w")
         for list in self.stateCatUtils:
             for slot in range(8):  # this needs to match how many slots are in each sublist
