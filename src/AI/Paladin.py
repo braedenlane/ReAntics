@@ -22,7 +22,11 @@ from AIPlayerUtils import *
 #will be implemented by students in Dr. Nuxoll's AI course.
 #
 #Variables:
-#   playerId - The id of the player.
+#   stateCatUtils - THE list, tracks state-categories and their utils
+#   indexUpdate - Tracks the state-cat to update
+#   eGreedy - Chance we make a random move
+#   eGreedyCount - Exponent to modify eGreedy
+#   train - True to update weights, false to run as is
 ##
 class AIPlayer(Player):
     stateCatUtils = []
@@ -36,7 +40,6 @@ class AIPlayer(Player):
     #
     #Parameters:
     #   inputPlayerId - The id to give the new player (int)
-    #   cpy           - whether the player is a copy (when playing itself)
     ##
     def __init__(self, inputPlayerId):
         super(AIPlayer,self).__init__(inputPlayerId, 'Paladin')
@@ -100,14 +103,12 @@ class AIPlayer(Player):
 
     ##
     #utility
-    #Description: evaluates game state on based on 12 game factors,
-    #             multiplies each by a weight and adds all of them up
+    #Description: evaluates game state on based on 7 game factors
     #
     #Parameters:
     #   currentState: a clone of the current GameState
-    #   gene: the gene (list of numbers) that contains the weights for each factor
     #
-    #Return: total sum of all factors * their respective weight
+    #Return: a list containing the utility of a state and the index of it in stateCatUtils
     #
     ##
     def utility(self, currentState):
@@ -115,11 +116,9 @@ class AIPlayer(Player):
         myId = currentState.whoseTurn
         enemyId = 1 - myId
         myCombatAnts = getAntList(currentState, myId, (DRONE, R_SOLDIER, SOLDIER,))
-        enemyCombatAnts = getAntList(currentState, enemyId, (DRONE, R_SOLDIER, SOLDIER,))
         myHill = getConstrList(currentState, myId, (ANTHILL,))[0]
         enemyHill = getConstrList(currentState, enemyId, (ANTHILL,))[0]
         myWorkers = getAntList(currentState, myId, (WORKER,))
-        enemyWorkers = getAntList(currentState, enemyId, (WORKER,))
         myFood = getCurrPlayerFood(self, currentState)
         myTunnel = getConstrList(currentState, myId, (TUNNEL,))[0]
         
@@ -136,6 +135,9 @@ class AIPlayer(Player):
         
         # 3: Offensive Ant Count
         offCount = len(myCombatAnts)
+
+        if (offCount > 4):
+            offCount = 4
         
         # 4: Worker Carrying?
         if(len(myWorkers) == 0):
@@ -194,6 +196,7 @@ class AIPlayer(Player):
         listOfChecks = [foodCount, workerCount, offCount, workerCarry,
                         avgDistNotCarry, avgDistCarry, avgDistEnemHill]
 
+        # Check to see if the state matches a category, if so, return util and index of category
         if len(self.stateCatUtils) > 0:
             for stateCat in self.stateCatUtils:
                 if ((stateCat[0] == foodCount) and
@@ -205,23 +208,26 @@ class AIPlayer(Player):
                         (stateCat[6] == avgDistEnemHill)):
                     return [stateCat[7], self.stateCatUtils.index(stateCat)]
 
+        # If it doesn't match a category, append it to the list of
+        # categories and return default util
         listOfChecks.append(0.0)
         self.stateCatUtils.append(listOfChecks)
         return [0.0, (len(self.stateCatUtils) - 1)]
             
 
 
-
+    ##
     #calcAvgDist
     #
     #Calculates average distance between all ants of a list and a target
     #
     #Params:
     #   antList: ant list to calculate average distance of
-    #   target:
+    #   target: the place the ant wants to go
     #
     #Return:
     #   average distance between ants in list and the target
+    ##
     def calcAvgDist(self, antList, target):
         if (len(antList) == 0):
             return 0
@@ -234,6 +240,7 @@ class AIPlayer(Player):
 
 
 
+    ##
     #findClosestEnemyWorker
     #
     #Finds closest enemy worker with regards to a specified ant
@@ -245,6 +252,7 @@ class AIPlayer(Player):
     #
     #Return:
     #   enemy worker that is closest to the specified ant
+    ##
     def findClosestEnemyWorker(self, ant, enemyWorkerList):
         #Base cases
         closest = enemyWorkerList[0]
@@ -260,13 +268,17 @@ class AIPlayer(Player):
 
         return closest
 
-
+    ##
+    #initWeights
+    #
     #https://www.pythontutorial.net/python-basics/python-check-if-file-exists/
     #10/15
+    #
+    #   Initializes the weights of the state category list if it has been trained
+    ##
     def initWeights(self):
         #Use random values if no prior genes exist
         path = Path('..\laneb22_profenna23_weights.txt')
-        print(path.is_file())
         if (path.is_file()):
             f = open("..\laneb22_profenna23_weights.txt", "r")
 
@@ -282,7 +294,11 @@ class AIPlayer(Player):
 
             f.close()
 
-
+    ##
+    #saveWeights
+    #
+    #   Saves the entire state category list to a file, to be accessed at a later run
+    ##
     def saveWeights(self):
         path = Path('.\laneb22_profenna23_weights.txt')
         if (path.is_file()):
@@ -291,19 +307,29 @@ class AIPlayer(Player):
         print("Open file\n")
         f = open(".\laneb22_profenna23_weights.txt", "w")
         for list in self.stateCatUtils:
-            for slot in range(8):  # TODO: make sure this matches
+            for slot in range(8):  # this needs to match how many slots are in each sublist
                 f.write(str(list[slot]))
                 f.write(' ')
             f.write("\n")
 
         f.close()
-        
+
+    ##
+    #updateWeights
+    #
+    #   Uses the TD algorithm to update the util of a state Category
+    #
+    #Params:
+    #   bestUtil: The utility of U(s'); the next state we went to
+    #   reward: the reward for being in this state
+    ##
     def updateWeights(self, bestUtil, reward):
+        # The TD-Learning algorithm
         self.stateCatUtils[self.indexUpdate][7] = (self.stateCatUtils[self.indexUpdate][7] + \
                                                     .15 * (reward + (.9 * bestUtil) - \
                                                     self.stateCatUtils[self.indexUpdate][7]))
 
-        ##
+    ##
     #getMove
     #Description: Gets the next move from the Player.
     #
@@ -313,6 +339,7 @@ class AIPlayer(Player):
     #Return: The Move to be made
     ##
     def getMove(self, currentState):
+        # Find the move with the best utility
         moveList = listAllLegalMoves(currentState)
         bestUtil = -100000
         bestMove = None
@@ -325,6 +352,7 @@ class AIPlayer(Player):
                 bestUtil = moveUtil
                 bestMove = move
 
+        # If training, use eGreedy to make random moves with eGreedy chance
         if(self.train):
             # eGreedy chance that it chooses a random move
             if random.random() < (self.eGreedy ** self.eGreedyCount):
@@ -334,12 +362,14 @@ class AIPlayer(Player):
                 bestIndex = ret[1]
                 bestMove = move
 
+            # Use TD to update the utils of the previous state
             if self.indexUpdate != -1:
                 self.updateWeights(bestUtil, -0.01)
             self.indexUpdate = bestIndex
 
             self.eGreedyCount = self.eGreedyCount + 1
 
+        # Not training, just use the weights we have learned
         if not (self.train):
             if (random.random() < .01):
                 move = moveList[random.randint(0, (len(moveList) - 1))]
@@ -370,8 +400,8 @@ class AIPlayer(Player):
     ##
     # registerWin
     #
-    # This agent doesn't learn
-    #
+    # This agent does learn
+    ##
     def registerWin(self, hasWon):
         # save weights after every game
         if hasWon:
